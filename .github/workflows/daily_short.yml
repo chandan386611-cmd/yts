@@ -65,7 +65,8 @@ jobs:
           ELEVENLABS_VOICE_ID: ${{ vars.ELEVENLABS_VOICE_ID || 'pNInz6obpgDQGcFmaJgB' }}
           ELEVENLABS_MODEL_ID: ${{ vars.ELEVENLABS_MODEL_ID || 'eleven_flash_v2_5' }}
           USE_EDGE_TTS_FALLBACK: ${{ vars.USE_EDGE_TTS_FALLBACK || 'true' }}
-          EDGE_TTS_VOICE: ${{ vars.EDGE_TTS_VOICE || 'en-US-ChristopherNeural' }}
+          EDGE_TTS_VOICE: ${{ vars.EDGE_TTS_VOICE || 'hi-IN-MadhurNeural' }}
+          LANGUAGE: ${{ vars.LANGUAGE || 'hinglish' }}
           ENABLE_FAL_HOOK: ${{ vars.ENABLE_FAL_HOOK || 'true' }}
           FAL_KEY: ${{ secrets.FAL_KEY }}
           FAL_DAILY_BUDGET_USD: ${{ vars.FAL_DAILY_BUDGET_USD || '1.00' }}

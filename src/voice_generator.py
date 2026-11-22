@@ -181,12 +181,22 @@ class VoiceGenerator:
         if not clean_text:
             return False
 
-        voices_to_try = [
-            config.EDGE_TTS_VOICE,
-            "en-US-GuyNeural",
-            "en-US-EricNeural",
-            "en-US-AriaNeural",
-        ]
+        is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
+        if is_hinglish:
+            voices_to_try = [
+                config.EDGE_TTS_VOICE,
+                "hi-IN-MadhurNeural",
+                "hi-IN-SwaraNeural",
+                "en-IN-PrabhatNeural",
+                "en-IN-NeerjaNeural",
+            ]
+        else:
+            voices_to_try = [
+                config.EDGE_TTS_VOICE,
+                "en-US-GuyNeural",
+                "en-US-EricNeural",
+                "en-US-AriaNeural",
+            ]
 
         for voice in voices_to_try:
             for attempt in range(1, 4):

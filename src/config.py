@@ -104,6 +104,9 @@ class PipelineConfig(BaseModel):
     NICHE_TOPIC: str = Field(
         default_factory=lambda: os.getenv("NICHE_TOPIC", "Dark Psychology & Human Behavior Facts")
     )
+    LANGUAGE: str = Field(
+        default_factory=lambda: os.getenv("LANGUAGE", "hinglish")
+    )
     ART_STYLE_SUFFIX: str = (
         "35mm cinematic film grain, dramatic chiaroscuro lighting, hyper-detailed, "
         "moody atmosphere, vertical 9:16 composition, no text, no watermarks"
@@ -149,7 +152,10 @@ class PipelineConfig(BaseModel):
         default_factory=lambda: os.getenv("USE_EDGE_TTS_FALLBACK", "true").lower() in ("true", "1", "yes")
     )
     EDGE_TTS_VOICE: str = Field(
-        default_factory=lambda: os.getenv("EDGE_TTS_VOICE", "en-US-ChristopherNeural")
+        default_factory=lambda: os.getenv(
+            "EDGE_TTS_VOICE",
+            "hi-IN-MadhurNeural" if os.getenv("LANGUAGE", "hinglish").lower() in ("hinglish", "hindi") else "en-US-ChristopherNeural"
+        )
     )
 
     # Visual Generation - Scene 0 Fal.ai Kling Video

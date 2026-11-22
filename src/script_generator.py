@@ -90,17 +90,34 @@ def load_recent_topics(max_history: int = 40) -> list[str]:
 def _build_system_prompt(recent_topics: list[str], niche: str) -> str:
     """Build the strict system instructions for Gemini."""
     avoid_list = "\n".join(f"- {t}" for t in recent_topics if t)
+    is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
+
+    if is_hinglish:
+        language_rule = (
+            "LANGUAGE REQUIREMENT (CRITICAL): Spoken narration MUST be written in natural, ultra-engaging conversational HINGLISH "
+            "(Hindi spoken in Roman/Latin English letters, exactly like viral Indian YouTubers write, e.g., 'Kya aapne kabhi notice kiya hai ki...', 'Darasal hota ye hai...'). "
+            "DO NOT write in Devanagari script; write purely in Latin/English letters so neural voiceover and subtitles render smoothly. "
+            "Title and Description should also be in high-CTR Hinglish with relevant hashtags. "
+            "CRITICAL: The 'visual_prompt' field for each scene MUST ALWAYS BE IN ENGLISH so image models understand it."
+        )
+    else:
+        language_rule = (
+            "LANGUAGE: All narration, title, and description MUST be written in punchy, captivating English. "
+            "Visual prompts must be in English."
+        )
+
     return f"""You are an elite YouTube Shorts scriptwriter and retention psychologist specializing in viral vertical video content in the niche: '{niche}'.
 
 CRITICAL RETENTION & TIMING RULES:
-1. TOTAL SPOKEN WORDS: MUST BE STRICTLY BETWEEN {config.TARGET_MIN_WORDS} AND {config.TARGET_MAX_WORDS} WORDS TOTAL across the entire script. Spoken at a natural 150-160 WPM, this results in exactly 40.0 to 45.0 seconds of audio.
-2. SCENE COUNT: EXACTLY {config.MIN_SCENES} TO {config.MAX_SCENES} DISTINCT SCENES (numbered 0 to N-1).
+1. {language_rule}
+2. TOTAL SPOKEN WORDS: MUST BE STRICTLY BETWEEN {config.TARGET_MIN_WORDS} AND {config.TARGET_MAX_WORDS} WORDS TOTAL across the entire script. Spoken at a natural 150-160 WPM, this results in exactly 40.0 to 45.0 seconds of audio.
+3. SCENE COUNT: EXACTLY {config.MIN_SCENES} TO {config.MAX_SCENES} DISTINCT SCENES (numbered 0 to N-1).
    - Scene 0 is THE 5-SECOND OPENING HOOK. It must ignite instant curiosity or fear of missing out, shocking the viewer in under 12 words without intro fluff.
    - Scenes 1 to N-1 must develop the psychological mechanism, dark behavioral revelation, or counter-intuitive human truth.
-   - Scene N-1 must deliver a punchy payoff/takeaway and a subtle engagement cliffhanger (e.g., 'Have you ever noticed this in someone close to you?').
-3. PACING: Each individual scene narration must be 9 to 14 words (~3.5 to 4.2 seconds).
-4. VISUAL PROMPTS: Each scene MUST have a highly atmospheric visual description focusing on symbolic metaphors, intense facial micro-expressions, shadows, retro-modern dark rooms, or surreal psychological motifs. Do NOT include words like 'cinematic' or 'hyper-detailed' in visual_prompt—art style will be locked automatically.
-5. STRICT DEDUPLICATION: DO NOT reuse or closely duplicate any of the following recently covered topics:
+   - Scene N-1 must deliver a punchy payoff/takeaway and a subtle engagement cliffhanger (e.g., 'Kya aapne bhi kabhi notice kiya hai? Comments mein batao.').
+4. PACING: Each individual scene narration must be 9 to 14 words (~3.5 to 4.2 seconds).
+5. VISUAL PROMPTS: Each scene MUST have a highly atmospheric visual description in English focusing on symbolic metaphors, intense facial micro-expressions, shadows, retro-modern dark rooms, or surreal psychological motifs. Do NOT include words like 'cinematic' or 'hyper-detailed' in visual_prompt—art style will be locked automatically.
+6. STRICT DEDUPLICATION: DO NOT reuse or closely duplicate any of the following recently covered topics:
 {avoid_list if avoid_list else "(No prior topics - pick an ultra-viral breakthrough fact)"}
 
 OUTPUT FORMAT:
@@ -113,8 +130,8 @@ You MUST respond ONLY with a valid raw JSON object matching this exact structure
   "scenes": [
     {{
       "scene_id": 0,
-      "narration": "Gripping 5-second hook narration text...",
-      "visual_prompt": "Subject and action description without style adjectives",
+      "narration": "Gripping 5-second hook narration text in Hinglish...",
+      "visual_prompt": "Subject and action description without style adjectives in English",
       "estimated_duration": 4.0
     }}
   ]
@@ -153,6 +170,79 @@ def _parse_gemini_response(response_text: str) -> ShortScript:
 def generate_fallback_offline_script(niche: str) -> ShortScript:
     """Generate a high-quality offline script if Gemini API key is unset or in dry-run mode."""
     logger.info("Generating curated offline fallback script for niche: %s", niche)
+    is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
+
+    if is_hinglish:
+        scenes = [
+            ScenePrompt(
+                scene_id=0,
+                narration="Agar koi aapse baat karte waqt 6 second se zyada bina muskuraye dekhe, to savdhan ho jao.",
+                visual_prompt="Man in heavy shadow staring directly into lens with piercing intense gaze",
+                estimated_duration=4.1,
+            ),
+            ScenePrompt(
+                scene_id=1,
+                narration="Psychology kehti hai ki iske do hi matlab hote hain: ya to intense attraction, ya hostile dominance.",
+                visual_prompt="Silhouette of two figures across a smoky dimly lit interrogation table",
+                estimated_duration=4.0,
+            ),
+            ScenePrompt(
+                scene_id=2,
+                narration="Jab insaan insecure ya threatened feel karta hai, to uski aankhein secretly dilate hone lagti hain.",
+                visual_prompt="Extreme macro close-up of a human eye pupil dilating against cold blue ambient light",
+                estimated_duration=3.8,
+            ),
+            ScenePrompt(
+                scene_id=3,
+                narration="Dark empaths isi cheez ka fayda uthate hain, aapse jhuth bolkar aapka trust jeetne ke liye.",
+                visual_prompt="Subtle smirk half-covered in darkness, holding a fractured antique porcelain mask",
+                estimated_duration=4.0,
+            ),
+            ScenePrompt(
+                scene_id=4,
+                narration="Woh aapke body posture aur baat karne ke style ko secretly copy karna shuru karte hain.",
+                visual_prompt="Two shadowy figures sitting side by side matching precise body postures like mirrors",
+                estimated_duration=3.9,
+            ),
+            ScenePrompt(
+                scene_id=5,
+                narration="Isse aapke dimag mein dopamine release hota hai aur aap bina soche unpar bharosa karne lagte ho.",
+                visual_prompt="Glowing neurological brain synapses pulsing with electric amber dopamine sparks",
+                estimated_duration=4.0,
+            ),
+            ScenePrompt(
+                scene_id=6,
+                narration="Is psychological trap ko todne ke liye, unki aankhon ke bajaye unke kaan ki taraf dekho.",
+                visual_prompt="Man breaking eye gaze calmly and tilting head toward the side with cool confidence",
+                estimated_duration=3.9,
+            ),
+            ScenePrompt(
+                scene_id=7,
+                narration="Aisa karne se unka mental control turant break ho jayega aur woh uncomfortable feel karenge.",
+                visual_prompt="Chessboard on a dark polished oak table where a black pawn blocks a towering white king",
+                estimated_duration=3.9,
+            ),
+            ScenePrompt(
+                scene_id=8,
+                narration="Notice karna, jaise hi aap ye karoge, unka fake confidence ek second mein gayab ho jayega.",
+                visual_prompt="Close up of a shocked face blinking rapidly under flickering warm fluorescent streetlamps",
+                estimated_duration=3.7,
+            ),
+            ScenePrompt(
+                scene_id=9,
+                narration="Kya aapke sath kabhi kisi ne aisa manipulation kiya hai? Comments mein zarur batana.",
+                visual_prompt="Solitary figure walking away down a wet midnight alleyway surrounded by street reflections",
+                estimated_duration=4.4,
+            ),
+        ]
+        return ShortScript(
+            topic="6-Second Eye Contact Trick & Dark Empath Mirroring",
+            title="Yeh Psychological Trick Aapko Bachayegi! #Shorts #Psychology",
+            description="Dark psychology trick jo aapko manipulation se bachayegi. Watch till end! #Psychology #Shorts #Facts #HumanBehavior",
+            tags=["psychology", "shorts", "mindset", "darkpsychology", "facts"],
+            scenes=scenes,
+        )
+
     scenes = [
         ScenePrompt(
             scene_id=0,
