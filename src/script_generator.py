@@ -111,48 +111,64 @@ def _build_system_prompt(recent_topics: list[str], niche: str) -> str:
 
     if is_hinglish:
         language_rule = (
-            "LANGUAGE REQUIREMENT (CRITICAL FOR NATURAL HUMAN PRONUNCIATION):\n"
-            "1. 'narration': Spoken voiceover text. MUST be written in conversational HINDI (Devanagari script, e.g. 'क्या आपने कभी सोचा है...', 'पिरामिड्स के पीछे का असली सच...'). "
-            "You can include common English loan words in English letters (e.g., 'Pyramids', 'Secret', 'Technology', 'Science'). Devanagari guarantees the neural voice engine speaks with 100% natural, human, authentic Indian pronunciation with ZERO robotic glitches!\n"
-            "2. 'display_text': On-screen subtitle text. MUST be written in punchy Romanized HINGLISH (Hindi in English/Latin letters, e.g., 'Kya aapne kabhi socha hai...', 'Pyramids ka asli sach...'). This will be rendered as bold center-screen pop-in subtitles.\n"
-            "3. 'title' & 'description': Write in catchy, high-CTR Hinglish with relevant hashtags.\n"
-            "4. 'visual_prompt': MUST ALWAYS BE IN ENGLISH for the AI image generator."
+            "LANGUAGE & AUDIO DYNAMICS REQUIREMENT (CRITICAL FOR VIRAL RETENTION):\n"
+            "1. 'narration': Spoken voiceover text. MUST be written in natural, cinematic conversational HINDI (Devanagari script, e.g. 'इमेजिन कीजिए...', 'दरअस्ल एक खौफनाक सच यह है...'). "
+            "You can include common English loan words in English letters (e.g., 'Brain', 'Secret', 'Dark Psychology', 'Mirroring Trap').\n"
+            "   AUDIO PUNCTUATION RULES (MANDATORY FOR STUDIO VOCAL DELIVERY):\n"
+            "   - Use '...' (ellipses) before shocking revelations, twists, and dramatic pauses (creates a natural 300ms suspense pause in neural audio).\n"
+            "   - Use ',' (commas) after conversational openers and natural breathing points.\n"
+            "   - Use '?' (question marks) on opening hooks and curiosity moments (forces upward vocal pitch inflection that grabs human attention).\n"
+            "   - Use '—' (em-dashes) for sudden mid-sentence mental pivots.\n"
+            "   - Use '!' selectively for impactful punchlines.\n"
+            "   - Use '।' (purna viram) or '.' for clean, confident sentence conclusions.\n"
+            "2. 'display_text': On-screen subtitle text. MUST be written in punchy Romanized HINGLISH (Hindi in English/Latin letters, e.g., 'Imagine kijiye...', 'Ek khaufnaak sach...').\n"
+            "3. 'title' & 'description': Write in high-CTR, high-curiosity Hinglish with viral hashtags.\n"
+            "4. 'search_query': MUST BE 2-3 CLEAN ENGLISH KEYWORDS matching real stock video footage (e.g., 'interrogation', 'shadow', 'human eye', 'people talking', 'dark room', 'chess', 'night walking').\n"
+            "5. 'visual_prompt': MUST ALWAYS BE IN ENGLISH for the AI video generator."
         )
     else:
         language_rule = (
-            "LANGUAGE: All narration, display_text, title, and description MUST be written in punchy, captivating English. "
+            "LANGUAGE: All narration, display_text, title, and description MUST be written in punchy, captivating English with expressive punctuation (... for suspense, ? for pitch inflection, — for dramatic pivots). "
             "Visual prompts must be in English."
         )
 
-    return f"""You are an elite YouTube Shorts scriptwriter and retention psychologist specializing in viral vertical video content in the niche: '{niche}'.
+    return f"""You are an elite Hollywood documentary filmmaker and viral YouTube Shorts thriller writer in the niche: '{niche}'.
+Your scripts do NOT sound like dry textbooks, Wikipedia articles, or academic lectures. Instead, you craft intense, addictive micro-thrillers inspired by Christopher Nolan and high-retention psychological mysteries.
+
+CRITICAL 4-BEAT THRILLER STORYTELLING ARC:
+1. Beat 1: The Shocking Cold Open (Scene 0)
+   - Under 13 words. Shatter common sense or warn the viewer about an invisible danger (e.g. 'इमेजिन कीजिए... कोई बात करते वक्त, चुपचाप आपका दिमाग स्कैन कर रहा है।').
+   - ZERO fluff, no 'Hello friends' or intro titles.
+2. Beat 2: The Deepening Mystery & The Hidden Trap (Scenes 1 to 3)
+   - Unfold the forbidden psychological mechanism or classified historical experiment with sensory tension.
+3. Beat 3: The Chilling Twist & Biological Vulnerability (Scenes 4 to 6)
+   - The mind-blowing realization: this is happening to the viewer in their daily life without their consent.
+4. Beat 4: The 1-Second Countermeasure & Comment Trigger (Scenes 7 to N-1)
+   - Give the viewer an instant psychological shield, ending on a cliffhanger question that forces them to comment and debate.
 
 CRITICAL RETENTION & TIMING RULES:
 1. {language_rule}
 2. TOTAL SPOKEN WORDS: MUST BE STRICTLY BETWEEN {config.TARGET_MIN_WORDS} AND {config.TARGET_MAX_WORDS} WORDS TOTAL across the entire script. Spoken at an energetic brisk pace (150-165 WPM), this results in exactly 40.0 to 45.0 seconds of audio.
 3. SCENE COUNT: EXACTLY {config.MIN_SCENES} TO {config.MAX_SCENES} DISTINCT SCENES (numbered 0 to N-1).
-   - Scene 0 is THE 5-SECOND OPENING HOOK. It must ignite instant curiosity or fear of missing out, shocking the viewer in under 12 words without intro fluff.
-   - Scenes 1 to N-1 must develop the psychological mechanism, dark behavioral revelation, or counter-intuitive truth.
-   - Scene N-1 must deliver a punchy payoff/takeaway and a subtle engagement cliffhanger (e.g., 'Aapko kya lagta hai? Comments mein batao.').
 4. PACING: Each individual scene narration must be 9 to 14 words (~3.5 to 4.2 seconds).
-5. VISUAL PROMPTS: Each scene MUST have a highly atmospheric visual description in English focusing on symbolic metaphors, intense facial micro-expressions, shadows, retro-modern dark rooms, or surreal motifs. Do NOT include words like 'cinematic' or 'hyper-detailed' in visual_prompt—art style will be locked automatically.
-6. STRICT DEDUPLICATION: DO NOT reuse or closely duplicate any of the following recently covered topics:
+5. STRICT DEDUPLICATION: DO NOT reuse or closely duplicate any of the following recently covered topics:
 {avoid_list if avoid_list else "(No prior topics - pick an ultra-viral breakthrough fact)"}
 
 OUTPUT FORMAT:
 You MUST respond ONLY with a valid raw JSON object matching this exact structure:
 {{
   "topic": "Concise topic title",
-  "title": "Viral Hook Title Under 60 Chars #Shorts #History",
-  "description": "Engaging 2-3 sentence description with high SEO keywords and hashtags #History #Shorts #Mysteries",
-  "tags": ["history", "mysteries", "shorts", "conspiracy", "facts"],
+  "title": "Viral Hook Title Under 60 Chars #Shorts #Psychology",
+  "description": "Engaging 2-3 sentence description with high SEO keywords and hashtags #Psychology #Shorts #Mysteries",
+  "tags": ["psychology", "mindset", "shorts", "darkpsychology", "facts"],
   "scenes": [
     {{
       "scene_id": 0,
-      "narration": "क्या आपने कभी सोचा है कि इजिप्ट के Pyramids सच में किसने बनाए? (Spoken Hindi for TTS)",
-      "display_text": "Kya aapne kabhi socha hai ki Egypt ke Pyramids kisne banaye? (Romanized Hinglish for subtitles)",
-      "visual_prompt": "Subject and action description without style adjectives in English",
-      "search_query": "2-3 clean keywords for real photographic search (e.g., 'Pyramids of Giza')",
-      "estimated_duration": 4.0
+      "narration": "इमेजिन कीजिए... कोई बात करते वक्त, चुपचाप आपका दिमाग स्कैन कर रहा है।",
+      "display_text": "Imagine kijiye... koi baat karte waqt chupchap aapka dimag scan kar raha hai.",
+      "visual_prompt": "Man in heavy shadow staring directly into camera with intense piercing gaze",
+      "search_query": "interrogation",
+      "estimated_duration": 4.1
     }}
   ]
 }}"""
@@ -196,90 +212,90 @@ def generate_fallback_offline_script(niche: str) -> ShortScript:
         scenes = [
             ScenePrompt(
                 scene_id=0,
-                narration="Agar koi 6 second bina muskuraye dekhe, to savdhan ho jao.",
-                display_text="Agar koi 6 second bina muskuraye dekhe, to savdhan ho jao!",
-                visual_prompt="Man in heavy shadow staring directly into lens with piercing intense gaze",
-                search_query="intense eye contact portrait",
+                narration="इमेजिन कीजिए... कोई बात करते वक्त, चुपचाप आपका दिमाग स्कैन कर रहा है।",
+                display_text="Imagine kijiye... koi baat karte waqt chupchap aapka dimag scan kar raha hai.",
+                visual_prompt="Man in heavy shadow staring directly into camera with intense piercing gaze",
+                search_query="interrogation",
                 estimated_duration=4.1,
             ),
             ScenePrompt(
                 scene_id=1,
-                narration="Psychology kehti hai iske do matlab hain: intense attraction, ya hostile dominance.",
-                display_text="Psychology kehti hai iske do matlab hain: attraction ya dominance.",
-                visual_prompt="Silhouette of two figures across a smoky dimly lit interrogation table",
-                search_query="shadowy interrogation silhouette",
+                narration="इसे साइकोलॉजी में मिर्ररिंग ट्रैप कहते हैं—जो शातिर मैनिपुलेटर्स इस्तेमाल करते हैं।",
+                display_text="Ise psychology mein Mirroring Trap kehte hain—jo manipulators use karte hain.",
+                visual_prompt="Dramatic silhouettes across a dimly lit table in darkness",
+                search_query="shadow",
                 estimated_duration=4.0,
             ),
             ScenePrompt(
                 scene_id=2,
-                narration="Jab insaan insecure feel karta hai, to uski aankhein secretly dilate hoti hain.",
-                display_text="Jab insaan insecure hota hai, uski aankhein secretly dilate hoti hain.",
-                visual_prompt="Extreme macro close-up of a human eye pupil dilating against cold blue ambient light",
-                search_query="human eye pupil macro",
-                estimated_duration=3.8,
-            ),
-            ScenePrompt(
-                scene_id=3,
-                narration="Dark empaths isi cheez ka fayda uthakar aapse jhuth bolte hain.",
-                display_text="Dark empaths isi cheez ka fayda uthakar jhuth bolte hain.",
-                visual_prompt="Subtle smirk half-covered in darkness, holding a fractured antique porcelain mask",
-                search_query="dark mask drama portrait",
-                estimated_duration=4.0,
-            ),
-            ScenePrompt(
-                scene_id=4,
-                narration="Woh aapka body posture aur style secretly copy karte hain.",
-                display_text="Woh aapka body posture aur style secretly copy karte hain.",
-                visual_prompt="Two shadowy figures sitting side by side matching precise body postures like mirrors",
-                search_query="two people body language mirror",
+                narration="वो चालाकी से आपकी बॉडी लैंग्वेज और बात करने की स्पीड कॉपी करते हैं।",
+                display_text="Woh chalaki se aapki body language aur speed copy karte hain.",
+                visual_prompt="Two people sitting close in deep conversation mirroring postures",
+                search_query="people talking",
                 estimated_duration=3.9,
             ),
             ScenePrompt(
-                scene_id=5,
-                narration="Isse dimag mein dopamine release hota hai aur aap bharosa karte ho.",
-                display_text="Isse dimag mein dopamine release hota hai aur aap bharosa karte ho.",
-                visual_prompt="Glowing neurological brain synapses pulsing with electric amber dopamine sparks",
-                search_query="brain synapses glowing neurons",
+                scene_id=3,
+                narration="नतीजा? आपका सबकॉन्शियस माइंड उनपर अंधा भरोसा करने लगता है।",
+                display_text="Nateeja? Aapka subconscious mind unpar andha bharosa karne lagta hai.",
+                visual_prompt="Extreme macro close-up of a human eye pupil dilating under dramatic lighting",
+                search_query="human eye",
+                estimated_duration=3.8,
+            ),
+            ScenePrompt(
+                scene_id=4,
+                narration="सबसे खौफनाक बात... आप अपने गहरे सीक्रेट्स खुद ही खोल देते हो।",
+                display_text="Sabse khaufnaak baat... aap apne gehre secrets khud hi khol dete ho.",
+                visual_prompt="Mysterious dim room with a lone light bulb turning on and off",
+                search_query="dark room",
                 estimated_duration=4.0,
             ),
             ScenePrompt(
+                scene_id=5,
+                narration="लेकिन इस खतरनाक गेम को आप एक सेकंड में तोड़ सकते हो।",
+                display_text="Lekin is khatarnaak game ko aap ek second mein tod sakte ho.",
+                visual_prompt="Chessboard on dark oak wood table with dramatic king and pawn",
+                search_query="chess",
+                estimated_duration=3.9,
+            ),
+            ScenePrompt(
                 scene_id=6,
-                narration="Is psychological trap ko todne ke liye, unke kaan ki taraf dekho.",
-                display_text="Is psychological trap ko todne ke liye, unke kaan ki taraf dekho.",
-                visual_prompt="Man breaking eye gaze calmly and tilting head toward the side with cool confidence",
-                search_query="calm person breaking eye contact",
+                narration="जब भी शक हो, अपनी बॉडी लैंग्वेज तुरंत बदलो—जैसे दूर देखना।",
+                display_text="Jab bhi shak ho, apni body language turant badlo—jaise door dekhna.",
+                visual_prompt="Person breaking intense eye contact calmly looking to the side",
+                search_query="calm person",
                 estimated_duration=3.9,
             ),
             ScenePrompt(
                 scene_id=7,
-                narration="Aisa karte hi unka saara mental control turant break ho jayega.",
-                display_text="Aisa karte hi unka saara mental control turant break ho jayega!",
-                visual_prompt="Chessboard on a dark polished oak table where a black pawn blocks a towering white king",
-                search_query="chessboard black pawn white king",
-                estimated_duration=3.9,
+                narration="आप नोटिस करोगे... सामने वाला इंसान अचानक कन्फ्यूज और नर्वस हो जाएगा।",
+                display_text="Aap notice karoge... saamne wala insaan achanak nervous ho jayega!",
+                visual_prompt="Close up of a tense face reacting with sudden shock",
+                search_query="shocked",
+                estimated_duration=3.8,
             ),
             ScenePrompt(
                 scene_id=8,
-                narration="Aap notice karna, unka fake confidence ek second mein gayab ho jayega.",
-                display_text="Aap notice karna, unka fake confidence ek second mein gayab hoga!",
-                visual_prompt="Close up of a shocked face blinking rapidly under flickering warm fluorescent streetlamps",
-                search_query="shocked face expression street lights",
+                narration="उनका सारा फेक कॉन्फिडेंस एक पल में हवा हो जाएगा।",
+                display_text="Unka saara fake confidence ek pal mein hawa ho jayega.",
+                visual_prompt="Mystical smoke swirling in darkness fading away",
+                search_query="smoke",
                 estimated_duration=3.7,
             ),
             ScenePrompt(
                 scene_id=9,
-                narration="Kya aapke sath aisa manipulation hua hai? Comments mein zarur batana.",
-                display_text="Kya aapke sath aisa manipulation hua hai? Comments mein zarur batana!",
-                visual_prompt="Solitary figure walking away down a wet midnight alleyway surrounded by street reflections",
-                search_query="solitary figure walking wet alley",
-                estimated_duration=4.4,
+                narration="क्या आपके साथ ऐसा खेल हुआ है? कमेंट्स में सच बताना।",
+                display_text="Kya aapke sath aisa khel hua hai? Comments mein sach batana!",
+                visual_prompt="Mysterious solitary figure walking down a dark street at night",
+                search_query="walking",
+                estimated_duration=4.2,
             ),
         ]
         return ShortScript(
-            topic="6-Second Eye Contact Trick & Dark Empath Mirroring",
-            title="Yeh Psychological Trick Aapko Bachayegi! #Shorts #Psychology",
-            description="Dark psychology trick jo aapko manipulation se bachayegi. Watch till end! #Psychology #Shorts #Facts #HumanBehavior",
-            tags=["psychology", "shorts", "mindset", "darkpsychology", "facts"],
+            topic="The Secret Mirroring Trap & Dark Psychology",
+            title="Aapka Dimaag Hack Ho Raha Hai! #Shorts #Psychology",
+            description="Dark psychology mirroring trap jo log aap par secretly use karte hain. Bachne ka secret tarika! #Psychology #Shorts #Mindset #Secrets",
+            tags=["psychology", "shorts", "mindset", "darkpsychology", "facts", "secrets"],
             scenes=scenes,
         )
 
