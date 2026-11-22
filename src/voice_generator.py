@@ -170,24 +170,101 @@ class VoiceGenerator:
             return False
 
     def _synthesize_edge_tts(self, text: str, output_path: Path) -> bool:
-        """Synthesize voiceover using Microsoft Edge TTS (high-quality neural voice)."""
+        """Synthesize voiceover using Microsoft Edge TTS with automatic retries and alternate voices."""
         try:
             import edge_tts
-
-            async def _run() -> None:
-                communicate = edge_tts.Communicate(
-                    text=text,
-                    voice=config.EDGE_TTS_VOICE,
-                    rate="+4%",  # Slight pace boost for high retention
-                    pitch="+0Hz",
-                )
-                await communicate.save(str(output_path))
-
-            asyncio.run(_run())
-            return output_path.exists() and output_path.stat().st_size > 0
-        except Exception as e:
-            logger.error("Edge-TTS synthesis error: %s", e)
+        except ImportError:
+            logger.debug("edge-tts library not installed.")
             return False
+
+        clean_text = text.strip()
+        if not clean_text:
+            return False
+
+        voices_to_try = [
+            config.EDGE_TTS_VOICE,
+            "en-US-GuyNeural",
+            "en-US-EricNeural",
+            "en-US-AriaNeural",
+        ]
+
+        for voice in voices_to_try:
+            for attempt in range(1, 4):
+                try:
+                    # Attempt 1: slight +4% pace boost; retries: standard +0%
+                    rate = "+4%" if attempt == 1 else "+0%"
+
+                    async def _run(v: str, r: str) -> None:
+                        communicate = edge_tts.Communicate(
+                            text=clean_text,
+                            voice=v,
+                            rate=r,
+                            pitch="+0Hz",
+                        )
+                        await communicate.save(str(output_path))
+
+                    asyncio.run(_run(voice, rate))
+                    if output_path.exists() and output_path.stat().st_size > 1000:
+                        return True
+                except Exception as e:
+                    logger.warning(
+                        "Edge-TTS attempt %d (%s) failed: %s. Retrying...",
+                        attempt,
+                        voice,
+                        e,
+                    )
+                    import time
+                    time.sleep(1.2)
+
+        return False
+
+    def _synthesize_windows_sapi(self, text: str, output_path: Path) -> bool:
+        """Fallback to Windows SAPI SpeechSynthesizer if offline or Edge-TTS is blocked."""
+        if os.name != "nt":
+            return False
+        try:
+            wav_path = output_path.with_suffix(".sapi.wav")
+            # Clean text: remove newlines/quotes that might break PowerShell arguments
+            clean_text = " ".join(text.split()).replace("'", "''")
+            ps_cmd = (
+                f"Add-Type -AssemblyName System.Speech; "
+                f"$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                f"$s.Rate = 1; "
+                f"$s.SetOutputToWaveFile('{str(wav_path.resolve())}'); "
+                f"$s.Speak('{clean_text}'); "
+                f"$s.Dispose()"
+            )
+            res = subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps_cmd],
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            if res.returncode == 0 and wav_path.exists() and wav_path.stat().st_size > 1000:
+                ffmpeg_bin = config.FFMPEG_PATH
+                if shutil.which(ffmpeg_bin) or Path(ffmpeg_bin).exists():
+                    subprocess.run(
+                        [
+                            ffmpeg_bin,
+                            "-y",
+                            "-i", str(wav_path),
+                            "-c:a", "libmp3lame",
+                            "-b:a", "128k",
+                            str(output_path),
+                        ],
+                        capture_output=True,
+                        check=True,
+                    )
+                    wav_path.unlink(missing_ok=True)
+                    return True
+                else:
+                    wav_path.replace(output_path)
+                    return True
+            else:
+                logger.warning("Windows SAPI PS failed (%s): %s", res.returncode, res.stderr[:200] if res.stderr else "no error")
+        except Exception as e:
+            logger.warning("Windows SAPI fallback failed: %s", e)
+        return False
 
     def _synthesize_dummy_scene_audio(self, text: str, output_path: Path) -> None:
         """Fallback synthesizer when offline or without TTS dependencies."""
@@ -210,13 +287,18 @@ class VoiceGenerator:
                 logger.warning("ElevenLabs error for scene %d: %s. Using edge-tts fallback.", index, e)
                 success = False
 
-        # Fallback to Edge-TTS
+        # Fallback to Edge-TTS with retries
         if not success:
             success = self._synthesize_edge_tts(scene.narration, output_path)
 
-        # Fallback to silent/sine placeholder if offline
+        # Fallback to Windows SAPI if offline or Edge-TTS dropped
+        if not success:
+            logger.warning("Edge-TTS failed for scene %d. Trying Windows SAPI fallback...", index)
+            success = self._synthesize_windows_sapi(scene.narration, output_path)
+
+        # Fallback to dummy placeholder only if all speech synthesis engines fail
         if not success or not output_path.exists() or output_path.stat().st_size == 0:
-            logger.warning("TTS engines failed for scene %d. Using offline audio placeholder.", index)
+            logger.warning("All TTS engines failed for scene %d. Using offline audio placeholder.", index)
             self._synthesize_dummy_scene_audio(scene.narration, output_path)
 
         duration = probe_audio_duration(output_path)
