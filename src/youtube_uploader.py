@@ -92,14 +92,15 @@ class YouTubeUploader:
         access_token = self._refresh_access_token_direct()
         file_size = video_path.stat().st_size
 
+        is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
         metadata = {
             "snippet": {
                 "title": script.title,
                 "description": script.description,
                 "tags": script.tags,
                 "categoryId": "27",
-                "defaultLanguage": "en",
-                "defaultAudioLanguage": "en",
+                "defaultLanguage": "hi" if is_hinglish else "en",
+                "defaultAudioLanguage": "hi" if is_hinglish else "en",
             },
             "status": {
                 "privacyStatus": config.YOUTUBE_PRIVACY_STATUS,
@@ -180,14 +181,15 @@ class YouTubeUploader:
 
         from googleapiclient.http import MediaFileUpload
 
+        is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
         body: dict[str, Any] = {
             "snippet": {
                 "title": script.title,
                 "description": script.description,
                 "tags": script.tags,
                 "categoryId": "27",  # Education / Psychological Science
-                "defaultLanguage": "en",
-                "defaultAudioLanguage": "en",
+                "defaultLanguage": "hi" if is_hinglish else "en",
+                "defaultAudioLanguage": "hi" if is_hinglish else "en",
             },
             "status": {
                 "privacyStatus": config.YOUTUBE_PRIVACY_STATUS,
