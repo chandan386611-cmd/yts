@@ -148,13 +148,16 @@ def run_pipeline(
         )
 
         # 4. Hybrid Visual Asset Generation
-        logger.info("--- STAGE 3: HYBRID VISUAL ASSET GENERATION ---")
+        logger.info("--- STAGE 3: HYBRID VISUAL ASSET GENERATION (REAL STOCK VIDEO + STILL FALLBACK) ---")
         visual_gen = VisualGenerator()
-        hook_video, scene_stills = visual_gen.generate_all_visuals(final_script)
+        scene_visuals = visual_gen.generate_all_visuals(final_script)
+        video_count = sum(1 for v in scene_visuals if v.suffix.lower() == ".mp4")
+        still_count = len(scene_visuals) - video_count
         logger.info(
-            "Visual assets ready (Scene 0 Video Hook: %s, Stills: %d)",
-            "YES (Fal.ai Kling)" if hook_video else "NO (FLUX Still Fallback)",
-            len(scene_stills),
+            "Visual assets ready (Total Scenes: %d | Real Video Clips: %d | Animated Stills: %d)",
+            len(scene_visuals),
+            video_count,
+            still_count,
         )
 
         # 5. Caption Generation (.ass with dynamic pop-in animations)
@@ -171,8 +174,7 @@ def run_pipeline(
         logger.info("--- STAGE 5: FFMPEG ASSEMBLY & SUBTITLE BURN-IN ---")
         editor = VideoEditor()
         final_video_path = editor.build_video(
-            hook_video_path=hook_video,
-            still_images=scene_stills,
+            scene_visuals=scene_visuals,
             scene_audios=scene_audios,
             merged_audio_path=merged_audio,
             subtitles_ass_path=ass_subtitles,

@@ -182,6 +182,16 @@ def test_cartesia_configuration_and_synthesis(tmp_path: Path) -> None:
     assert dur > 1.0
 
 
+def test_coverr_stock_video_configuration() -> None:
+    """Verify Coverr real stock video configuration."""
+    assert hasattr(config, "COVERR_API_KEY")
+    from src.visual_generator import VisualGenerator
+    vg = VisualGenerator()
+    assert hasattr(vg, "_call_coverr_api")
+    assert hasattr(vg, "_call_mixkit_video")
+    assert hasattr(vg, "generate_scene_visual")
+
+
 if __name__ == "__main__":
     import tempfile
     print("Running verification test suite...")
@@ -206,10 +216,12 @@ if __name__ == "__main__":
         print("PASS: test_history_deduplication")
         test_cartesia_configuration_and_synthesis(tmp_path)
         print("PASS: test_cartesia_configuration_and_synthesis")
+        test_coverr_stock_video_configuration()
+        print("PASS: test_coverr_stock_video_configuration")
 
     test_ffmpeg_filter_path_escaping()
     print("PASS: test_ffmpeg_filter_path_escaping")
     test_default_audio_asset_presence()
     print("PASS: test_default_audio_asset_presence")
-    print("\nALL 11 TESTS PASSED SUCCESSFULLY!")
+    print("\nALL 12 TESTS PASSED SUCCESSFULLY!")
 

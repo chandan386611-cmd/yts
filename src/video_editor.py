@@ -53,21 +53,23 @@ class VideoEditor:
             "Please install FFmpeg or set FFMPEG_PATH."
         )
 
-    def render_hook_video_clip(
+    def render_video_clip(
         self,
-        hook_video_path: Path,
+        video_path: Path,
         target_duration: float,
         output_clip_path: Path,
+        scene_index: int = 0,
     ) -> Path:
         """
-        Trims or speed-adjusts Scene 0 hook.mp4 to match exact narration duration.
-        Enforces 1080x1920 resolution, 30fps, and yuv420p format.
+        Trims or speed-adjusts any source MP4 video clip to match exact narration duration.
+        Enforces 1080x1920 vertical resolution, 30fps, and yuv420p format. Loops if source is short.
         """
         ffmpeg_bin = self._get_ffmpeg()
-        actual_hook_dur = probe_audio_duration(hook_video_path)
+        actual_dur = probe_audio_duration(video_path)
         logger.info(
-            "Matching Scene 0 video hook (source: %.2fs, target: %.2fs)...",
-            actual_hook_dur,
+            "Rendering vertical video clip for scene %d (source: %.2fs, target: %.2fs)...",
+            scene_index,
+            actual_dur,
             target_duration,
         )
 
@@ -83,7 +85,7 @@ class VideoEditor:
             ffmpeg_bin,
             "-y",
             "-stream_loop", "-1",  # Loop if source is shorter than target duration
-            "-i", str(hook_video_path),
+            "-i", str(video_path),
             "-t", f"{target_duration:.3f}",
             "-vf", vf,
             "-c:v", "libx264",
@@ -94,9 +96,12 @@ class VideoEditor:
             str(output_clip_path),
         ]
 
-        logger.debug("Running FFmpeg Hook Video command: %s", " ".join(cmd))
+        logger.debug("Running FFmpeg Video Clip command: %s", " ".join(cmd))
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return output_clip_path
+
+    # Keep backward compatibility alias
+    render_hook_video_clip = render_video_clip
 
     def render_ken_burns_clip(
         self,
@@ -377,53 +382,66 @@ class VideoEditor:
 
     def build_video(
         self,
-        hook_video_path: Path | None,
-        still_images: list[Path],
-        scene_audios: list[tuple[Path, float]],
-        merged_audio_path: Path,
-        subtitles_ass_path: Path,
-        total_duration: float,
+        scene_visuals: list[Path] | None = None,
+        hook_video_path: Path | None = None,
+        still_images: list[Path] | None = None,
+        scene_audios: list[tuple[Path, float]] | None = None,
+        merged_audio_path: Path | None = None,
+        subtitles_ass_path: Path | None = None,
+        total_duration: float = 40.0,
     ) -> Path:
         """
         Coordinates full video production pipeline from raw assets to final Short.
+        Supports real stock moving video clips (.mp4) and animated still images (.png).
         """
+        if scene_audios is None or merged_audio_path is None or subtitles_ass_path is None:
+            raise ValueError("scene_audios, merged_audio_path, and subtitles_ass_path are required.")
+
         # Check if FFmpeg is available
         ffmpeg_bin = config.FFMPEG_PATH
         if not (shutil.which(ffmpeg_bin) or Path(ffmpeg_bin).exists()):
             logger.warning("FFmpeg binary not found in local environment. Using OpenCV video renderer.")
-            return self._render_playable_opencv_fallback(still_images, scene_audios, self.output_final_path)
+            fallback_images = scene_visuals or still_images or []
+            return self._render_playable_opencv_fallback(fallback_images, scene_audios, self.output_final_path)
 
-        clip_paths: list[Path] = []
         durations = [dur for _, dur in scene_audios]
 
-        # 1. Process Scene 0
-        dur_0 = durations[0]
-        clip_0_path = self.clips_dir / "clip_0.mp4"
+        # Resolve visuals list (either from scene_visuals or hook_video_path + still_images)
+        visuals: list[Path] = []
+        if scene_visuals and len(scene_visuals) == len(durations):
+            visuals = list(scene_visuals)
+        elif still_images:
+            if hook_video_path and hook_video_path.exists():
+                visuals = [hook_video_path] + list(still_images)
+            else:
+                visuals = list(still_images)
+        elif scene_visuals:
+            visuals = list(scene_visuals)
 
-        if hook_video_path and hook_video_path.exists():
-            self.render_hook_video_clip(hook_video_path, dur_0, clip_0_path)
-            clip_paths.append(clip_0_path)
-            stills_start_idx = 1
-        else:
-            # Still image for Scene 0 with Ken Burns
-            still_0 = still_images[0]
-            self.render_ken_burns_clip(still_0, dur_0, clip_0_path, scene_index=0)
-            clip_paths.append(clip_0_path)
-            stills_start_idx = 1
-
-        # 2. Process Scenes 1 to N with Ken Burns animation
-        for i in range(stills_start_idx, len(durations)):
-            dur_i = durations[i]
-            still_path = still_images[i]
+        clip_paths: list[Path] = []
+        for i, dur_i in enumerate(durations):
             clip_i_path = self.clips_dir / f"clip_{i}.mp4"
-            self.render_ken_burns_clip(still_path, dur_i, clip_i_path, scene_index=i)
+            vis_path = visuals[i] if i < len(visuals) else None
+
+            if vis_path and vis_path.exists() and vis_path.suffix.lower() == ".mp4":
+                self.render_video_clip(vis_path, dur_i, clip_i_path, scene_index=i)
+            elif vis_path and vis_path.exists():
+                self.render_ken_burns_clip(vis_path, dur_i, clip_i_path, scene_index=i)
+            else:
+                # Emergency fallback if asset missing: generate dark procedural image
+                from src.visual_generator import generate_procedural_cinematic_fallback
+                fallback_img_path = self.clips_dir / f"fallback_{i}.png"
+                img = generate_procedural_cinematic_fallback(i, "dark cinematic scene")
+                img.save(fallback_img_path, format="PNG")
+                self.render_ken_burns_clip(fallback_img_path, dur_i, clip_i_path, scene_index=i)
+
             clip_paths.append(clip_i_path)
 
-        # 3. Concatenate video clips
+        # Concatenate video clips
         raw_video_path = self.clips_dir / "concatenated_raw.mp4"
         self.concatenate_scene_clips(clip_paths, raw_video_path)
 
-        # 4. Final audio mix and subtitle burn
+        # Final audio mix and subtitle burn
         final_video = self.render_final_short(
             raw_video_path=raw_video_path,
             voiceover_audio_path=merged_audio_path,

@@ -181,13 +181,14 @@ class PipelineConfig(BaseModel):
     )
     FAL_ESTIMATED_COST_PER_CALL: float = 0.15  # Kling turbo 5s video approx cost
 
-    # Visual Generation - Scenes 1-N AI Engines
+    # Visual Generation - Stock Video & AI Engines
+    COVERR_API_KEY: str = Field(default_factory=lambda: os.getenv("COVERR_API_KEY", ""))
+    PEXELS_API_KEY: str = Field(default_factory=lambda: os.getenv("PEXELS_API_KEY", ""))
     CLOUDFLARE_ACCOUNT_ID: str = Field(default_factory=lambda: os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
     CLOUDFLARE_API_TOKEN: str = Field(default_factory=lambda: os.getenv("CLOUDFLARE_API_TOKEN", ""))
     CLOUDFLARE_FLUX_MODEL: str = Field(
         default_factory=lambda: os.getenv("CLOUDFLARE_FLUX_MODEL", "@cf/black-forest-labs/flux-1-schnell")
     )
-    PEXELS_API_KEY: str = Field(default_factory=lambda: os.getenv("PEXELS_API_KEY", ""))
 
     # YouTube Data API v3 & Publishing
     YOUTUBE_CLIENT_ID: str = Field(default_factory=lambda: os.getenv("YOUTUBE_CLIENT_ID", ""))

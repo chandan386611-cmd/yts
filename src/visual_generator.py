@@ -270,6 +270,124 @@ class VisualGenerator:
 
         return None
 
+    def _call_coverr_api(self, query: str, output_path: Path) -> Path | None:
+        """Fetch 1080p real stock video clip matching query from Coverr API."""
+        coverr_key = getattr(config, "COVERR_API_KEY", "")
+        if not coverr_key:
+            return None
+
+        clean_q = re.sub(r"[^\w\s]", " ", query).strip()
+        if not clean_q:
+            return None
+
+        # Build progressive fallback search terms
+        tokens = [w for w in clean_q.split() if len(w) >= 3 and w.lower() not in {"portrait", "shot", "macro", "view", "scene"}]
+        candidate_queries = [clean_q]
+        if len(tokens) >= 2:
+            candidate_queries.append(" ".join(tokens[:2]))
+        for t in tokens:
+            if t not in candidate_queries:
+                candidate_queries.append(t)
+
+        url = "https://api.coverr.co/videos"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        }
+
+        for q in candidate_queries:
+            params = {
+                "query": q,
+                "page_size": 4,
+                "urls": "true",
+                "api_key": coverr_key,
+            }
+            try:
+                res = requests.get(url, headers=headers, params=params, timeout=10)
+                if res.status_code == 200:
+                    data = res.json()
+                    hits = data.get("hits", [])
+                    for hit in hits:
+                        urls = hit.get("urls", {})
+                        video_url = urls.get("mp4") or urls.get("mp4_download") or urls.get("mp4_preview")
+                        if video_url:
+                            dl = requests.get(video_url, stream=True, timeout=25)
+                            if dl.status_code == 200:
+                                with open(output_path, "wb") as f:
+                                    for chunk in dl.iter_content(chunk_size=16384):
+                                        f.write(chunk)
+                                if output_path.exists() and output_path.stat().st_size > 50000:
+                                    logger.info(
+                                        "Retrieved real 1080p Coverr video for '%s' ('%s', %.2f MB)",
+                                        q,
+                                        hit.get("title", "clip")[:40],
+                                        output_path.stat().st_size / (1024 * 1024),
+                                    )
+                                    return output_path
+                elif res.status_code in (401, 403, 429):
+                    logger.warning("Coverr API HTTP %d: %s", res.status_code, res.text[:100])
+                    break
+            except Exception as e:
+                logger.debug("Coverr fetch error for '%s': %s", q, e)
+
+        return None
+
+    def _call_mixkit_video(self, query: str, output_path: Path) -> Path | None:
+        """Fetch HD stock video clip from Mixkit (Envato) public CDN."""
+        clean_q = re.sub(r"[^\w\s]", " ", query).strip()
+        if not clean_q:
+            return None
+
+        tokens = [w.lower() for w in clean_q.split() if len(w) >= 3 and w.lower() not in {"portrait", "shot", "macro", "view", "scene"}]
+        candidate_tags = []
+        if len(tokens) >= 2:
+            candidate_tags.append("-".join(tokens[:2]))
+        for t in tokens:
+            if t not in candidate_tags:
+                candidate_tags.append(t)
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        }
+
+        for tag in candidate_tags:
+            search_url = f"https://mixkit.co/free-stock-video/{tag}/"
+            try:
+                res = requests.get(search_url, headers=headers, timeout=10)
+                if res.status_code != 200:
+                    continue
+
+                links = re.findall(r"https://assets\.mixkit\.co/videos/(\d+)/\1-[a-zA-Z0-9_\-\.]+\.mp4", res.text)
+                if not links:
+                    raw_links = re.findall(r"https://assets\.mixkit\.co/videos/[a-zA-Z0-9_\-\./]+?\.mp4", res.text)
+                    if raw_links:
+                        video_url = raw_links[0]
+                    else:
+                        continue
+                else:
+                    video_id = links[0]
+                    video_url = f"https://assets.mixkit.co/videos/{video_id}/{video_id}-720.mp4"
+
+                dl = requests.get(video_url, stream=True, headers=headers, timeout=25)
+                if dl.status_code != 200 and "video_id" in locals():
+                    video_url = f"https://assets.mixkit.co/videos/{video_id}/{video_id}-360.mp4"
+                    dl = requests.get(video_url, stream=True, headers=headers, timeout=25)
+
+                if dl.status_code == 200:
+                    with open(output_path, "wb") as f:
+                        for chunk in dl.iter_content(chunk_size=16384):
+                            f.write(chunk)
+                    if output_path.exists() and output_path.stat().st_size > 50000:
+                        logger.info(
+                            "Retrieved real HD Mixkit video for '%s' (%.2f MB)",
+                            tag,
+                            output_path.stat().st_size / (1024 * 1024),
+                        )
+                        return output_path
+            except Exception as e:
+                logger.debug("Mixkit fetch error for '%s': %s", tag, e)
+
+        return None
+
     def _call_pexels_api(self, query: str) -> bytes | None:
         """Fetch vertical high-res photography matching query from Pexels API."""
         pexels_key = getattr(config, "PEXELS_API_KEY", "")
@@ -454,21 +572,55 @@ class VisualGenerator:
         logger.info("Saved verified 1080x1920 image to %s", out_path)
         return out_path
 
-    def generate_all_visuals(self, script: ShortScript) -> tuple[Path | None, list[Path]]:
+    def generate_scene_visual(self, scene: ScenePrompt, index: int, topic: str = "") -> Path:
         """
-        Generates all visual assets for the Short.
+        Multi-tier visual generator prioritizing real moving stock video clips:
+        Tier 1: Coverr Stock Video API (1080p MP4 real footage)
+        Tier 2: Mixkit Stock Video CDN (HD MP4 real footage)
+        Tier 3: Cloudflare Workers AI FLUX (still image)
+        Tier 4: Pexels API (still image)
+        Tier 5: Wikimedia Commons High-Res Archive (still image)
+        Tier 6: Pollinations.ai FLUX (still image)
+        Tier 7: Procedural cinematic fallback (still image)
+        """
+        video_out = self.visuals_dir / f"scene_{index}.mp4"
+        search_query = getattr(scene, "image_search_query", "") or scene.visual_prompt[:40]
+
+        logger.info("Generating visual for Scene %d (Query: '%s')...", index, search_query)
+
+        # Tier 1: Coverr Real Video
+        if config.COVERR_API_KEY:
+            try:
+                v_path = self._call_coverr_api(search_query, video_out)
+                if v_path and v_path.exists() and v_path.stat().st_size > 50000:
+                    return v_path
+            except Exception as e:
+                logger.debug("Coverr video fetch error for scene %d: %s", index, e)
+
+        # Tier 2: Mixkit Real Video
+        try:
+            v_path = self._call_mixkit_video(search_query, video_out)
+            if v_path and v_path.exists() and v_path.stat().st_size > 50000:
+                return v_path
+        except Exception as e:
+            logger.debug("Mixkit video fetch error for scene %d: %s", index, e)
+
+        # Tier 3-7: Still Image Fallback with Ken Burns
+        img_path = self.generate_scene_still_image(scene, index, topic=topic)
+        return img_path
+
+    def generate_all_visuals(self, script: ShortScript) -> list[Path]:
+        """
+        Generates all visual assets (real moving video clips or still images) for the Short.
 
         Returns:
-            (hook_video_path_or_none, list_of_scene_still_images)
-            If Scene 0 AI video generation succeeds, hook_video_path is set to hook.mp4.
-            If Scene 0 AI video fails or is disabled, hook_video_path is None, and
-            scene_0.png is included in the still images list.
+            list[Path]: List of video (.mp4) or image (.png) paths matching each scene in script.
         """
-        hook_video_path: Path | None = None
-        scene_stills: list[Path] = []
+        scene_visuals: list[Path] = []
 
-        # Scene 0: Attempt genuine AI video motion via Fal.ai Kling Video
+        # Scene 0: Attempt genuine AI video motion via Fal.ai Kling Video if configured
         scene_0 = script.scenes[0]
+        hook_video_path: Path | None = None
         if config.ENABLE_FAL_HOOK and config.FAL_KEY:
             try:
                 hook_video_path = self._call_fal_kling_video(
@@ -476,23 +628,19 @@ class VisualGenerator:
                     topic=script.topic,
                 )
             except Exception as e:
-                logger.warning("Fal.ai video hook generation failed: %s. Falling back to animated still.", e)
+                logger.warning("Fal.ai video hook generation failed: %s. Using stock video.", e)
                 hook_video_path = None
 
-        # If Scene 0 video hook was not created, generate a still image for Scene 0
-        start_idx = 1
-        if hook_video_path is None:
-            logger.info("Scene 0 will use camera-animated still image.")
-            img_0 = self.generate_scene_still_image(scene_0, 0, topic=script.topic)
-            scene_stills.append(img_0)
+        if hook_video_path and hook_video_path.exists():
+            scene_visuals.append(hook_video_path)
+            start_idx = 1
         else:
-            # Placeholder still in case of video inspection fallback
-            self.generate_scene_still_image(scene_0, 0, topic=script.topic)
+            start_idx = 0
 
-        # Scenes 1 to N: Generate still images
+        # Generate real moving video clips (or still fallbacks) for all remaining scenes
         for idx in range(start_idx, len(script.scenes)):
             scene = script.scenes[idx]
-            img_path = self.generate_scene_still_image(scene, idx, topic=script.topic)
-            scene_stills.append(img_path)
+            visual_path = self.generate_scene_visual(scene, idx, topic=script.topic)
+            scene_visuals.append(visual_path)
 
-        return hook_video_path, scene_stills
+        return scene_visuals
