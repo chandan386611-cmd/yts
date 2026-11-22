@@ -102,7 +102,7 @@ class PipelineConfig(BaseModel):
 
     # Niche & Art-Direction Style Locks
     NICHE_TOPIC: str = Field(
-        default_factory=lambda: os.getenv("NICHE_TOPIC", "Dark Psychology & Human Behavior Facts")
+        default_factory=lambda: os.getenv("NICHE_TOPIC", "Dark Psychology & Human Behavior Facts").strip()
     )
     LANGUAGE: str = Field(
         default_factory=lambda: os.getenv("LANGUAGE", "hinglish")
@@ -138,7 +138,7 @@ class PipelineConfig(BaseModel):
 
     # Script Generation (Google Gemini)
     GEMINI_API_KEY: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
-    GEMINI_MODEL: str = Field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+    GEMINI_MODEL: str = Field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"))
 
     # Voiceover Generation (Cartesia Sonic + ElevenLabs + Edge-TTS Fallback)
     CARTESIA_API_KEY: str = Field(default_factory=lambda: os.getenv("CARTESIA_API_KEY", ""))

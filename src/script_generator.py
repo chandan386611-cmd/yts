@@ -132,19 +132,22 @@ def _build_system_prompt(recent_topics: list[str], niche: str) -> str:
             "Visual prompts must be in English."
         )
 
+    niche_words = re.findall(r"[A-Za-z]+", niche)
+    clean_tag = niche_words[0].capitalize() if niche_words else "Facts"
+
     return f"""You are an elite Hollywood documentary filmmaker and viral YouTube Shorts thriller writer in the niche: '{niche}'.
-Your scripts do NOT sound like dry textbooks, Wikipedia articles, or academic lectures. Instead, you craft intense, addictive micro-thrillers inspired by Christopher Nolan and high-retention psychological mysteries.
+Your scripts do NOT sound like dry textbooks, Wikipedia articles, or academic lectures. Instead, you craft intense, addictive micro-thrillers inspired by Christopher Nolan and high-retention documentary mysteries.
 
 CRITICAL 4-BEAT THRILLER STORYTELLING ARC:
 1. Beat 1: The Shocking Cold Open (Scene 0)
-   - Under 13 words. Shatter common sense or warn the viewer about an invisible danger (e.g. 'इमेजिन कीजिए... कोई बात करते वक्त, चुपचाप आपका दिमाग स्कैन कर रहा है।').
+   - Under 13 words. Shatter common sense or warn the viewer about an invisible reality or mind-blowing breakthrough in '{niche}'.
    - ZERO fluff, no 'Hello friends' or intro titles.
-2. Beat 2: The Deepening Mystery & The Hidden Trap (Scenes 1 to 3)
-   - Unfold the forbidden psychological mechanism or classified historical experiment with sensory tension.
-3. Beat 3: The Chilling Twist & Biological Vulnerability (Scenes 4 to 6)
-   - The mind-blowing realization: this is happening to the viewer in their daily life without their consent.
-4. Beat 4: The 1-Second Countermeasure & Comment Trigger (Scenes 7 to N-1)
-   - Give the viewer an instant psychological shield, ending on a cliffhanger question that forces them to comment and debate.
+2. Beat 2: The Deepening Mystery & The Hidden Mechanism (Scenes 1 to 3)
+   - Unfold the classified experiment, futuristic technology, cosmic anomaly, or hidden mechanism with sensory tension.
+3. Beat 3: The Chilling Twist & Reality Shift (Scenes 4 to 6)
+   - The mind-blowing realization: this changes everything we thought we knew about our world, brain, or future.
+4. Beat 4: The Provocative Cliffhanger & Comment Trigger (Scenes 7 to N-1)
+   - Give the viewer a thought-provoking perspective or question that forces them to comment and debate.
 
 CRITICAL RETENTION & TIMING RULES:
 1. {language_rule}
@@ -158,16 +161,16 @@ OUTPUT FORMAT:
 You MUST respond ONLY with a valid raw JSON object matching this exact structure:
 {{
   "topic": "Concise topic title",
-  "title": "Viral Hook Title Under 60 Chars #Shorts #Psychology",
-  "description": "Engaging 2-3 sentence description with high SEO keywords and hashtags #Psychology #Shorts #Mysteries",
-  "tags": ["psychology", "mindset", "shorts", "darkpsychology", "facts"],
+  "title": "Viral Hook Title Under 60 Chars #Shorts #{clean_tag}",
+  "description": "Engaging 2-3 sentence description with high SEO keywords and hashtags #{clean_tag} #Shorts #Viral",
+  "tags": ["{clean_tag.lower()}", "shorts", "viral", "facts"],
   "scenes": [
     {{
       "scene_id": 0,
       "narration": "इमेजिन कीजिए... कोई बात करते वक्त, चुपचाप आपका दिमाग स्कैन कर रहा है।",
       "display_text": "Imagine kijiye... koi baat karte waqt chupchap aapka dimag scan kar raha hai.",
-      "visual_prompt": "Man in heavy shadow staring directly into camera with intense piercing gaze",
-      "search_query": "interrogation",
+      "visual_prompt": "Cinematic visual description in English for AI video generator",
+      "search_query": "stock video keywords",
       "estimated_duration": 4.1
     }}
   ]
@@ -193,21 +196,374 @@ def _parse_gemini_response(response_text: str) -> ShortScript:
             raise ValueError(f"Failed to parse JSON from Gemini response: {exc}\nRaw: {response_text[:300]}") from exc
 
     scenes = [ScenePrompt(**s) for s in data["scenes"]]
+    niche_words = re.findall(r"[A-Za-z]+", config.NICHE_TOPIC)
+    default_tags = [w.lower() for w in niche_words[:3]] + ["shorts", "viral"]
     script = ShortScript(
         topic=data["topic"],
         title=data["title"],
         description=data["description"],
-        tags=data.get("tags", ["psychology", "shorts"]),
+        tags=data.get("tags") or default_tags,
         scenes=scenes,
     )
     return script
 
 
 def generate_fallback_offline_script(niche: str) -> ShortScript:
-    """Generate a high-quality offline script if Gemini API key is unset or in dry-run mode."""
+    """Generate a high-quality curated offline script matched to the requested niche if Gemini API is unavailable."""
     logger.info("Generating curated offline fallback script for niche: %s", niche)
+    niche_lower = (niche or "").lower()
     is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
 
+    # 1. Science, Future & Technology Niche
+    if any(k in niche_lower for k in ["tech", "science", "future", "ai", "robot", "quantum", "cyber", "digital"]):
+        if is_hinglish:
+            scenes = [
+                ScenePrompt(
+                    scene_id=0,
+                    narration="इमेजिन कीजिए... 2035 में आपका दिमाग सीधे इंटरनेट से कनेक्ट हो जाए।",
+                    display_text="Imagine kijiye... 2035 mein aapka dimag internet se connect ho jaye.",
+                    visual_prompt="Futuristic human silhouette with glowing cybernetic neural connections in head",
+                    search_query="technology",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=1,
+                    narration="साइंटिस्ट्स का दावा है कि न्यूरालिंक और क्वांटम कंप्यूटर्स इसे मुमकिन कर रहे हैं।",
+                    display_text="Scientists ka dawa hai ki Neuralink aur Quantum computers ise mumkin kar rahe hain.",
+                    visual_prompt="High tech laboratory with glowing quantum supercomputer core",
+                    search_query="computer",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=2,
+                    narration="अब आपको कुछ याद करने या गूगल पर टाइप करने की जरूरत नहीं पड़ेगी।",
+                    display_text="Ab aapko kuch yaad karne ya type karne ki zaroorat nahi padegi.",
+                    visual_prompt="Person wearing subtle futuristic cybernetic glasses looking at digital holograms",
+                    search_query="virtual reality",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=3,
+                    narration="सिर्फ एक सोच... और पूरी दुनिया का डेटा आपकी आंखों के सामने तैरने लगेगा।",
+                    display_text="Sirf ek soch... aur poori duniya ka data aapki aankhon ke saamne hoga.",
+                    visual_prompt="Futuristic digital interface data streams glowing in dark room",
+                    search_query="digital data",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=4,
+                    narration="लेकिन ठहरिए... इस सुपर-इंटेलिजेंस का एक खौफनाक डार्क साइड भी है।",
+                    display_text="Lekin thehriye... is super intelligence ka ek khaufnaak dark side bhi hai.",
+                    visual_prompt="Dramatic warning red digital glitches across glowing motherboard",
+                    search_query="server room",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=5,
+                    narration="अगर आपका दिमाग ऑनलाइन होगा, तो क्या कोई आपके विचारों को हैक कर सकेगा?",
+                    display_text="Agar aapka dimag online hoga, toh kya koi aapke vichaaron ko hack kar sakega?",
+                    visual_prompt="Shadowy hooded hacker sitting in front of neon computer screens",
+                    search_query="hacker",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=6,
+                    narration="आपकी पर्सनल यादें, बैंक पासवर्ड्स और सीक्रेट्स—एक क्लिक में बिक सकते हैं।",
+                    display_text="Aapki personal yaadein aur secrets—ek click mein bik sakte hain.",
+                    visual_prompt="Abstract digital lock breaking open into glowing code fragments",
+                    search_query="cyber security",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=7,
+                    narration="टेक कंपनियां दावा करती हैं कि बायोमेट्रिक फायरवॉल्स आपको हमेशा प्रोटेक्ट रखेंगी।",
+                    display_text="Tech companies dawa karti hain ki firewalls aapko protect rakhengi.",
+                    visual_prompt="Futuristic robotic arm assembling high precision microchips",
+                    search_query="robot arm",
+                    estimated_duration=3.8,
+                ),
+                ScenePrompt(
+                    scene_id=8,
+                    narration="लेकिन सवाल यह है... क्या मशीन कभी इंसानी सोच से ज्यादा ताकतवर बन जाएगी?",
+                    display_text="Lekin sawal yeh hai... kya machine insaan se zyada taakatwar ban jayegi?",
+                    visual_prompt="Humanoid robot with glowing blue optical eyes looking at human hand",
+                    search_query="humanoid robot",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=9,
+                    narration="क्या आप अपने दिमाग में न्यूरल चिप लगवाएंगे? अपनी राय कमेंट्स में बताइए।",
+                    display_text="Kya aap apne dimag mein chip lagwayenge? Comments mein batayein!",
+                    visual_prompt="Sprawling futuristic city skyline at night with flying vehicles and neon lights",
+                    search_query="future city",
+                    estimated_duration=4.3,
+                ),
+            ]
+            return ShortScript(
+                topic="Brain-Computer Interfaces & The 2035 Neural Singularity",
+                title="2035 Mein Insaan Amar Ho Jayenge? #Shorts #Tech #Future",
+                description="Kya 2035 tak humara dimaag cloud par upload ho jayega? Quantum computers aur nanobots ka shocking sach! #Science #Technology #Future #AI #Shorts",
+                tags=["science", "technology", "future", "ai", "tech", "shorts", "quantum"],
+                scenes=scenes,
+            )
+        else:
+            scenes = [
+                ScenePrompt(
+                    scene_id=0,
+                    narration="Imagine waking up in 2035 with your conscious mind plugged into the web.",
+                    visual_prompt="Futuristic human silhouette with glowing cybernetic neural connections in head",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=1,
+                    narration="Quantum computers and neural interfaces are rapidly bringing the singularity to human life.",
+                    visual_prompt="High tech laboratory with glowing quantum supercomputer core",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=2,
+                    narration="You will never need to memorize facts or touch a smartphone again.",
+                    visual_prompt="Person wearing subtle futuristic cybernetic glasses looking at digital holograms",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=3,
+                    narration="A single fleeting thought, and humanity's collective knowledge flashes before your eyes.",
+                    visual_prompt="Futuristic digital interface data streams glowing in dark room",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=4,
+                    narration="Yet this superhuman cognitive leap conceals an alarming, existential vulnerability.",
+                    visual_prompt="Dramatic warning red digital glitches across glowing motherboard",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=5,
+                    narration="If human thoughts become network packets, can dark actors hijack your perception?",
+                    visual_prompt="Shadowy hooded hacker sitting in front of neon computer screens",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=6,
+                    narration="Your most intimate private memories could be extracted and traded overnight.",
+                    visual_prompt="Abstract digital lock breaking open into glowing code fragments",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=7,
+                    narration="Technologists promise unbreakable biological firewalls will protect personal autonomy forever.",
+                    visual_prompt="Futuristic robotic arm assembling high precision microchips",
+                    estimated_duration=3.8,
+                ),
+                ScenePrompt(
+                    scene_id=8,
+                    narration="Will human wisdom stay in command, or will synthetic minds surpass us?",
+                    visual_prompt="Humanoid robot with glowing blue optical eyes looking at human hand",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=9,
+                    narration="Would you agree to merge your mind with AI? Tell us below.",
+                    visual_prompt="Sprawling futuristic city skyline at night with flying vehicles and neon lights",
+                    estimated_duration=4.3,
+                ),
+            ]
+            return ShortScript(
+                topic="Brain-Computer Interfaces & The 2035 Singularity",
+                title="Will Humans Merge With AI By 2035? #Shorts #Tech",
+                description="Neural interfaces and quantum leaps are bridging humanity and cyberspace. What does the future hold? #Technology #Science #Future #AI #Shorts",
+                tags=["technology", "science", "future", "ai", "singularity", "shorts"],
+                scenes=scenes,
+            )
+
+    # 2. Space, Cosmos & Astronomy Niche
+    if any(k in niche_lower for k in ["space", "cosmos", "universe", "astronomy", "alien", "galaxy"]):
+        if is_hinglish:
+            scenes = [
+                ScenePrompt(
+                    scene_id=0,
+                    narration="इमेजिन कीजिए... हमारे ब्रह्मांड में एक ऐसी जगह है, जहां सिर्फ खौफनाक सन्नाटा है।",
+                    display_text="Imagine kijiye... brahmand mein ek aisi jagah hai jahan khaufnaak sannata hai.",
+                    visual_prompt="Deep outer space with distant shimmering stars and cosmic nebula",
+                    search_query="outer space",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=1,
+                    narration="इसे Boötes Void कहते हैं—जो 330 मिलियन लाइट इयर्स में फैला विशाल शून्य है।",
+                    display_text="Ise Boötes Void kehte hain—jo 330 million light-years lamba shunya hai.",
+                    visual_prompt="Vast empty dark void in space surrounded by distant spiral galaxies",
+                    search_query="galaxy",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=2,
+                    narration="नॉर्मल स्पेस के हिसाब से, यहां कम से कम 10,000 गैलेक्सीज होनी चाहिए थीं।",
+                    display_text="Normal space ke hisaab se yahan 10,000 galaxies honi chahiye thin.",
+                    visual_prompt="Cluster of glowing spiral galaxies spinning slowly in deep space",
+                    search_query="space station",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=3,
+                    narration="लेकिन एस्ट्रोनॉमर्स को पूरे इलाके में... सिर्फ कुछ गिनी-चुनी गैलेक्सीज ही मिलीं।",
+                    display_text="Lekin astronomers ko yahan sirf kuch gini-chuni galaxies hi milin.",
+                    visual_prompt="Giant optical telescope observatory dome open toward starlit night sky",
+                    search_query="telescope",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=4,
+                    narration="बाकी पूरा इलाका बिल्कुल वीरान, ठंडा और भयानक रूप से खाली पड़ा है।",
+                    display_text="Baki poora ilaka bilkul veeran aur bhayanak roop se khali pada hai.",
+                    visual_prompt="Mysterious dark celestial sphere absorbing starlight in cold deep space",
+                    search_query="black hole",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=5,
+                    narration="वैज्ञानिक हैरान हैं... क्या किसी अज्ञात महाशक्ति ने इन अरबों तारों को निगल लिया?",
+                    display_text="Scientists heran hain... kya kisi shakti ne in arbon taron ko nigal liya?",
+                    visual_prompt="Supermassive black hole gravitational lensing warping surrounding light",
+                    search_query="supernova",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=6,
+                    narration="या फिर कोई एडवांस टाइप-3 सिविलाइजेशन सारे तारों की एनर्जी हार्वेस्ट कर रही है?",
+                    display_text="Ya koi advanced civilization saare taron ki energy harvest kar rahi hai?",
+                    visual_prompt="Gigantic Dyson sphere mega-structure encircling a glowing cosmic star",
+                    search_query="sci fi space",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=7,
+                    narration="अगर आप इस वॉइड के बीच हों, तो चारों तरफ सिर्फ अंतहीन अंधेरा दिखेगा।",
+                    display_text="Agar aap is void ke beech hon, toh chaaron taraf sirf andhera dikhega.",
+                    visual_prompt="Lone astronaut floating in the pitch-black silence of endless deep space",
+                    search_query="astronaut",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=8,
+                    narration="कोई भी तारा या रोशनी आपको कभी दिखाई नहीं देगी।",
+                    display_text="Koi bhi tara ya roshni aapko kabhi dikhayi nahi degi.",
+                    visual_prompt="Planet Earth isolated against infinite black void of space",
+                    search_query="planet earth",
+                    estimated_duration=3.7,
+                ),
+                ScenePrompt(
+                    scene_id=9,
+                    narration="क्या ब्रह्मांड में हम वाकई अकेले हैं? अपने विचार कमेंट्स में जरूर बताइए।",
+                    display_text="Kya brahmand mein hum akele hain? Comments mein zaroor batayein.",
+                    visual_prompt="Milky way galaxy arching across a silent starry midnight horizon",
+                    search_query="night sky stars",
+                    estimated_duration=4.3,
+                ),
+            ]
+            return ShortScript(
+                topic="The Boötes Void & The Great Cosmic Silence",
+                title="Space Ka Sabse Khaufnaak Sannata! #Shorts #Space",
+                description="Universe mein 330 million light years lamba khali andhera! Boötes Void ka unheard rahasya. #Space #Universe #Cosmos #Shorts #Mystery",
+                tags=["space", "universe", "cosmos", "astronomy", "shorts", "mystery"],
+                scenes=scenes,
+            )
+
+    # 3. History & Ancient Mysteries Niche
+    if any(k in niche_lower for k in ["history", "ancient", "mystery", "archaeology", "ruin"]):
+        if is_hinglish:
+            scenes = [
+                ScenePrompt(
+                    scene_id=0,
+                    narration="इमेजिन कीजिए... अपने घर का तहखाना खोदते वक्त, आपको एक गुप्त शहर मिल जाए।",
+                    display_text="Imagine kijiye... ghar ke niche aapko ek gupt shehar mil jaye.",
+                    visual_prompt="Dark antique stone cellar stairs leading down into a vast subterranean cavern",
+                    search_query="ancient cave",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=1,
+                    narration="1963 में तुर्की के एक आदमी ने दीवार तोड़ी, और वो दंग रह गया।",
+                    display_text="1963 mein Turkey ke ek aadmi ne deewar todi aur woh dang reh gaya.",
+                    visual_prompt="Archaeologist holding torch illuminating ancient underground stone tunnels",
+                    search_query="ancient ruins",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=2,
+                    narration="ज़मीन के 85 मीटर नीचे... 20,000 इंसानों के रहने की सीक्रेट जगह छिपी थी।",
+                    display_text="Zameen ke 85 meter niche 20,000 logon ka gupt shehar chhipa tha.",
+                    visual_prompt="Massive underground stone city carved directly into volcanic rock",
+                    search_query="underground stone",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=3,
+                    narration="इसे डेरिनकुयू कहते हैं—जिसमें 18 लेवल्स, स्कूल, मंदिर और ताजी हवा की शाफ्ट्स थीं।",
+                    display_text="Ise Derinkuyu kehte hain—jisme 18 levels aur secret rooms the.",
+                    visual_prompt="Ancient massive round stone millstone door blocking a subterranean entrance",
+                    search_query="stone door",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=4,
+                    narration="सबसे रहस्यमयी बात यह है कि... इसे हजारों साल पहले बिना मशीनों के कैसे तराशा गया?",
+                    display_text="Sabse bada rahasya... ise bina machines ke kaise tarasha gaya?",
+                    visual_prompt="Chiseled ancient carved stone pillars and archways deep underground",
+                    search_query="ancient pillar",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=5,
+                    narration="भारी पत्थर के दरवाजे ऐसे बने थे कि सिर्फ अंदर से बंद हो सकें।",
+                    display_text="Bhari patthar ke darwaze aise bane the jo sirf andar se band hote the.",
+                    visual_prompt="Silhouette of a torchbearer walking through claustrophobic ancient corridors",
+                    search_query="torchlight",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=6,
+                    narration="आखिर हमारे पूर्वज... ज़मीन के ऊपर किस भयानक खतरे से बचने के लिए छुपे थे?",
+                    display_text="Aakhir purvaj zameen ke upar kis khatre se bachne ke liye chhupe the?",
+                    visual_prompt="Ancient atmospheric stone city ruins on surface under stormy dramatic sky",
+                    search_query="ruins landscape",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=7,
+                    narration="क्या कोई आसमानी तबाही आई थी, या फिर किसी अज्ञात दुश्मन का खौफनाक हमला?",
+                    display_text="Kya koi aasmani tabahi thi ya kisi dushman ka khaufnaak hamla?",
+                    visual_prompt="Ancient apocalyptic painting depicting fiery skies and fleeing shadows",
+                    search_query="historical wall",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=8,
+                    narration="इतनी विशाल इंजीनियरिंग आज के मॉडर्न इंजीनियर्स को भी पूरी तरह हैरान कर देती है।",
+                    display_text="Itni vishal engineering modern engineers ko bhi heran kar deti hai.",
+                    visual_prompt="Top-down geometric architectural blueprint map of multilevel underground labyrinth",
+                    search_query="old architecture",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=9,
+                    narration="क्या हमारे पूर्वज हमसे ज्यादा एडवांस थे? कमेंट्स में अपनी राय जरूर बताइए।",
+                    display_text="Kya purvaj humse zyada advance the? Comments mein zaroor batayein.",
+                    visual_prompt="Mysterious lone explorer looking out from a dark cave opening toward sunrise",
+                    search_query="mountain cave",
+                    estimated_duration=4.2,
+                ),
+            ]
+            return ShortScript(
+                topic="The Underground Citadel of Derinkuyu",
+                title="Zameen Ke 85 Meter Niche Chhupa Shehar! #Shorts #History",
+                description="Turkey mein zameen ke 85 meter niche 20,000 logon ka gupt shehar mila tha. Derinkuyu ka anokha rahasya! #History #Ancient #Mystery #Shorts",
+                tags=["history", "ancient", "mystery", "archaeology", "shorts"],
+                scenes=scenes,
+            )
+
+    # 4. Default / Psychology & Human Behavior Niche
     if is_hinglish:
         scenes = [
             ScenePrompt(
@@ -407,59 +763,56 @@ class ScriptGenerator:
             logger.warning("Could not initialize Gemini SDK: %s", e)
             return None
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1.5, min=2, max=10),
-        retry=retry_if_exception_type(Exception),
-        reraise=True,
-    )
     def _call_gemini_api(self, prompt: str, system_instruction: str) -> str:
-        """Execute Gemini API call with exponential backoff (SDK or direct REST)."""
-        client_bundle = self._get_client()
+        """
+        Execute Gemini API call with automatic multi-model cascading fallback.
+        Tries primary model, then cascades through available flash-lite and flash models
+        if quota (HTTP 429), temporary unavailability (HTTP 503), or deprecated model (HTTP 404) occurs.
+        """
+        candidate_models = [
+            self.model_name,
+            "gemini-flash-lite-latest",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+            "gemini-2.5-flash",
+        ]
+        unique_models = list(dict.fromkeys([m for m in candidate_models if m]))
+        last_error: Exception | None = None
 
-        if client_bundle is None:
-            # Direct REST API fallback using requests
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.api_key}"
-            payload = {
-                "system_instruction": {"parts": [{"text": system_instruction}]},
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.75,
-                    "responseMimeType": "application/json",
-                },
-            }
-            res = requests.post(url, json=payload, timeout=45)
-            if res.status_code != 200:
-                raise RuntimeError(f"Gemini API error (HTTP {res.status_code}): {res.text}")
-            data = res.json()
-            candidates = data.get("candidates", [])
-            if not candidates:
-                raise RuntimeError(f"No candidates returned by Gemini: {data}")
-            parts = candidates[0].get("content", {}).get("parts", [])
-            return parts[0].get("text", "") if parts else ""
+        for model_to_try in unique_models:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_to_try}:generateContent?key={self.api_key}"
+                payload = {
+                    "system_instruction": {"parts": [{"text": system_instruction}]},
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.75,
+                        "responseMimeType": "application/json",
+                    },
+                }
+                res = requests.post(url, json=payload, timeout=45)
+                if res.status_code == 200:
+                    data = res.json()
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        text = parts[0].get("text", "") if parts else ""
+                        if text.strip():
+                            if self.model_name != model_to_try:
+                                logger.info("Model '%s' succeeded. Upgraded active model.", model_to_try)
+                            self.model_name = model_to_try
+                            return text
+                    raise RuntimeError(f"No candidate text returned by {model_to_try}")
+                else:
+                    raise RuntimeError(f"HTTP {res.status_code}: {res.text[:140]}")
 
-        sdk_type, client = client_bundle
+            except Exception as e:
+                err_str = str(e)
+                logger.warning("Gemini model '%s' failed (%s). Cascading to next model...", model_to_try, err_str[:120])
+                last_error = e
+                continue
 
-        if sdk_type == "genai":
-            from google.genai import types
-            response = client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=0.75,
-                    response_mime_type="application/json",
-                ),
-            )
-            return response.text or ""
-        else:
-            # Legacy google.generativeai
-            full_prompt = f"SYSTEM INSTRUCTIONS:\n{system_instruction}\n\nUSER PROMPT:\n{prompt}"
-            response = client.generate_content(
-                full_prompt,
-                generation_config={"temperature": 0.75, "response_mime_type": "application/json"},
-            )
-            return response.text or ""
+        raise RuntimeError(f"All Gemini models exhausted. Last error: {last_error}")
 
     def generate_script(self, custom_topic: str | None = None) -> ShortScript:
         """Generate a brand-new structured Short script."""
@@ -474,11 +827,11 @@ class ScriptGenerator:
         if custom_topic:
             user_prompt += f" Focus specifically on the topic: '{custom_topic}'."
         else:
-            user_prompt += " Pick a shocking, little-known psychological phenomenon or behavioral bias that triggers high curiosity and sharing."
+            user_prompt += f" Pick a shocking, mind-blowing, little-known breakthrough fact or mystery in '{config.NICHE_TOPIC}' that triggers extreme curiosity and sharing."
 
         user_prompt += f"\nREMINDER: Total spoken word count across ALL scenes must strictly be between {config.TARGET_MIN_WORDS} and {config.TARGET_MAX_WORDS} words."
 
-        logger.info("Requesting script from Gemini model '%s'...", self.model_name)
+        logger.info("Requesting script from Gemini for niche '%s' using model '%s'...", config.NICHE_TOPIC, self.model_name)
         try:
             raw_text = self._call_gemini_api(user_prompt, system_instruction)
             script = _parse_gemini_response(raw_text)
@@ -490,7 +843,7 @@ class ScriptGenerator:
             )
             return script
         except Exception as e:
-            logger.error("Gemini generation failed (%s). Falling back to curated script.", e)
+            logger.error("Gemini generation failed (%s). Falling back to curated script for niche '%s'.", e, config.NICHE_TOPIC)
             return generate_fallback_offline_script(config.NICHE_TOPIC)
 
     def re_prompt_with_duration_feedback(
