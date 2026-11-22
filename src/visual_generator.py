@@ -287,18 +287,23 @@ class VisualGenerator:
             "image_size": "768x1024",
             "response_format": "b64_json",
         }
-        try:
-            res = requests.post(url, json=payload, headers=headers, timeout=40)
-            if res.status_code == 200:
-                data = res.json()
-                images = data.get("images", [])
-                if images and "b64_json" in images[0]:
-                    logger.info("Successfully generated image via SiliconFlow FLUX")
-                    return base64.b64decode(images[0]["b64_json"])
-            else:
-                logger.warning("SiliconFlow API HTTP %d: %s", res.status_code, res.text[:150])
-        except Exception as e:
-            logger.debug("SiliconFlow call failed: %s", e)
+        for attempt in range(2):
+            try:
+                res = requests.post(url, json=payload, headers=headers, timeout=50)
+                if res.status_code == 200:
+                    data = res.json()
+                    images = data.get("images", [])
+                    if images and "b64_json" in images[0]:
+                        logger.info("Successfully generated image via SiliconFlow FLUX")
+                        return base64.b64decode(images[0]["b64_json"])
+                else:
+                    logger.warning("SiliconFlow API HTTP %d: %s", res.status_code, res.text[:150])
+            except requests.RequestException as e:
+                logger.debug("SiliconFlow attempt %d failed: %s", attempt + 1, e)
+                time.sleep(1.5)
+            except Exception as e:
+                logger.debug("SiliconFlow error: %s", e)
+                break
         return None
 
     def _call_pexels_api(self, query: str) -> bytes | None:
