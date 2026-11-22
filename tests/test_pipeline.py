@@ -169,6 +169,19 @@ def test_default_audio_asset_presence() -> None:
     assert config.WHOOSH_PATH.stat().st_size > 0
 
 
+def test_cartesia_configuration_and_synthesis(tmp_path: Path) -> None:
+    """Verify Cartesia voice engine configuration and fallback synthesis."""
+    assert config.CARTESIA_VOICE_ID == "7e8cb11d-37af-476b-ab8f-25da99b18644"
+    assert config.CARTESIA_MODEL == "sonic-latest"
+    from src.voice_generator import VoiceGenerator
+    vg = VoiceGenerator()
+    dummy_out = tmp_path / "test_voice.mp3"
+    vg._synthesize_dummy_scene_audio("Testing fallback audio generation for shorts.", dummy_out)
+    assert dummy_out.exists()
+    dur = probe_audio_duration(dummy_out)
+    assert dur > 1.0
+
+
 if __name__ == "__main__":
     import tempfile
     print("Running verification test suite...")
@@ -191,10 +204,12 @@ if __name__ == "__main__":
         print("PASS: test_ass_subtitle_generation")
         test_history_deduplication(tmp_path)
         print("PASS: test_history_deduplication")
+        test_cartesia_configuration_and_synthesis(tmp_path)
+        print("PASS: test_cartesia_configuration_and_synthesis")
 
     test_ffmpeg_filter_path_escaping()
     print("PASS: test_ffmpeg_filter_path_escaping")
     test_default_audio_asset_presence()
     print("PASS: test_default_audio_asset_presence")
-    print("\nALL 10 TESTS PASSED SUCCESSFULLY!")
+    print("\nALL 11 TESTS PASSED SUCCESSFULLY!")
 

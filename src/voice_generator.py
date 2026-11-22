@@ -1,5 +1,5 @@
 """
-Voiceover Generator with ElevenLabs API and Edge-TTS Fallback.
+Voiceover Generator with Cartesia Sonic, ElevenLabs API, and Edge-TTS Fallback.
 
 Generates scene-by-scene audio with realistic pacing, measures exact ffprobe
 durations, enforces a strict 40.0s - 45.0s audio duration gate, and coordinates
@@ -124,6 +124,67 @@ class VoiceGenerator:
     def __init__(self) -> None:
         self.temp_audio_dir = config.TEMP_DIR / "audio"
         self.temp_audio_dir.mkdir(parents=True, exist_ok=True)
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1.2, min=2, max=8),
+        retry=retry_if_exception_type(requests.RequestException),
+        reraise=True,
+    )
+    def _synthesize_cartesia(self, text: str, output_path: Path) -> bool:
+        """Call Cartesia Sonic API for hyper-realistic human voiceover."""
+        if not config.CARTESIA_API_KEY:
+            return False
+
+        clean_text = text.strip()
+        if not clean_text:
+            return False
+
+        is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
+        url = "https://api.cartesia.ai/tts/bytes"
+        headers = {
+            "X-API-Key": config.CARTESIA_API_KEY,
+            "Cartesia-Version": "2024-06-10",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model_id": getattr(config, "CARTESIA_MODEL", "sonic-latest"),
+            "transcript": clean_text,
+            "voice": {
+                "mode": "id",
+                "id": getattr(config, "CARTESIA_VOICE_ID", "7e8cb11d-37af-476b-ab8f-25da99b18644"),
+            },
+            "output_format": {
+                "container": "mp3",
+                "sample_rate": 44100,
+                "bit_rate": 128000,
+            },
+            "language": "hi" if is_hinglish else "en",
+        }
+
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
+            if response.status_code == 200 and len(response.content) > 500:
+                with open(output_path, "wb") as f:
+                    f.write(response.content)
+                return True
+            elif response.status_code in (401, 402, 429):
+                logger.warning(
+                    "Cartesia quota limit or auth issue (HTTP %d: %s). Falling back to next tier.",
+                    response.status_code,
+                    response.text[:200],
+                )
+                return False
+            else:
+                logger.warning(
+                    "Cartesia API unexpected response (HTTP %d: %s)",
+                    response.status_code,
+                    response.text[:200],
+                )
+                return False
+        except requests.RequestException as e:
+            logger.warning("Cartesia network request failed: %s", e)
+            raise
 
     @retry(
         stop=stop_after_attempt(3),
@@ -290,24 +351,38 @@ class VoiceGenerator:
         output_path = self.temp_audio_dir / f"scene_{index}.mp3"
         success = False
 
-        # Attempt ElevenLabs if not forced to edge-tts
-        if not config.USE_EDGE_TTS_FALLBACK and config.ELEVENLABS_API_KEY:
+        # Tier 1: Cartesia Sonic (Hyper-realistic studio voice)
+        if config.CARTESIA_API_KEY:
             try:
-                success = self._synthesize_elevenlabs(scene.narration, output_path)
+                success = self._synthesize_cartesia(scene.narration, output_path)
+                if success:
+                    logger.info("Scene %d synthesized with Cartesia Sonic.", index)
             except Exception as e:
-                logger.warning("ElevenLabs error for scene %d: %s. Using edge-tts fallback.", index, e)
+                logger.warning("Cartesia Sonic error for scene %d: %s. Trying next tier.", index, e)
                 success = False
 
-        # Fallback to Edge-TTS with retries
+        # Tier 2: ElevenLabs
+        if not success and not config.USE_EDGE_TTS_FALLBACK and config.ELEVENLABS_API_KEY:
+            try:
+                success = self._synthesize_elevenlabs(scene.narration, output_path)
+                if success:
+                    logger.info("Scene %d synthesized with ElevenLabs.", index)
+            except Exception as e:
+                logger.warning("ElevenLabs error for scene %d: %s. Using Edge-TTS fallback.", index, e)
+                success = False
+
+        # Tier 3: Edge-TTS with retries
         if not success:
             success = self._synthesize_edge_tts(scene.narration, output_path)
+            if success:
+                logger.info("Scene %d synthesized with Edge-TTS.", index)
 
-        # Fallback to Windows SAPI if offline or Edge-TTS dropped
+        # Tier 4: Windows SAPI if offline or Edge-TTS dropped
         if not success:
             logger.warning("Edge-TTS failed for scene %d. Trying Windows SAPI fallback...", index)
             success = self._synthesize_windows_sapi(scene.narration, output_path)
 
-        # Fallback to dummy placeholder only if all speech synthesis engines fail
+        # Tier 5: Dummy placeholder only if all speech synthesis engines fail
         if not success or not output_path.exists() or output_path.stat().st_size == 0:
             logger.warning("All TTS engines failed for scene %d. Using offline audio placeholder.", index)
             self._synthesize_dummy_scene_audio(scene.narration, output_path)

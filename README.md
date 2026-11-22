@@ -26,8 +26,9 @@ A production-grade, cost-capped, fully autonomous vertical (1080x1920, 30fps) Yo
                                         ▼
             ┌────────────────────────────────────────────────────────┐
             │                 src/voice_generator.py                 │
-            │       ElevenLabs (eleven_flash_v2_5 @ 0.5 cred/char)   │
-            │           Automatic Fallback to Edge-TTS               │
+            │   Tier 1: Cartesia Sonic (sonic-latest, ultra-human)   │
+            │   Tier 2: ElevenLabs (eleven_flash_v2_5)               │
+            │   Tier 3: Microsoft Edge-TTS (+14% speed boost)        │
             └───────────────────────────┬────────────────────────────┘
                                         │
                              [ffprobe Duration Gate]
@@ -106,7 +107,7 @@ A production-grade, cost-capped, fully autonomous vertical (1080x1920, 30fps) Yo
 │   ├── __init__.py
 │   ├── config.py                    # Central settings, constants, and budget guards
 │   ├── script_generator.py          # Gemini AI script generator + duration re-prompter
-│   ├── voice_generator.py           # ElevenLabs / Edge-TTS audio generator & duration gate
+│   ├── voice_generator.py           # Cartesia Sonic / ElevenLabs / Edge-TTS audio & duration gate
 │   ├── visual_generator.py          # Fal.ai Kling hook + Cloudflare FLUX stills
 │   ├── caption_generator.py         # faster-whisper transcription + dynamic ASS subtitles
 │   ├── video_editor.py              # FFmpeg zoompan, audio ducking, and subtitle burn-in

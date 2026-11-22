@@ -140,7 +140,14 @@ class PipelineConfig(BaseModel):
     GEMINI_API_KEY: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
     GEMINI_MODEL: str = Field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
 
-    # Voiceover Generation (ElevenLabs + Edge-TTS Fallback)
+    # Voiceover Generation (Cartesia Sonic + ElevenLabs + Edge-TTS Fallback)
+    CARTESIA_API_KEY: str = Field(default_factory=lambda: os.getenv("CARTESIA_API_KEY", ""))
+    CARTESIA_VOICE_ID: str = Field(
+        default_factory=lambda: os.getenv("CARTESIA_VOICE_ID", "7e8cb11d-37af-476b-ab8f-25da99b18644")
+    )
+    CARTESIA_MODEL: str = Field(
+        default_factory=lambda: os.getenv("CARTESIA_MODEL", "sonic-latest")
+    )
     ELEVENLABS_API_KEY: str = Field(default_factory=lambda: os.getenv("ELEVENLABS_API_KEY", ""))
     ELEVENLABS_VOICE_ID: str = Field(
         default_factory=lambda: os.getenv("ELEVENLABS_VOICE_ID", "pNInz6obpgDQGcFmaJgB")
