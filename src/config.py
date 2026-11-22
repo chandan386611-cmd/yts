@@ -174,7 +174,11 @@ class PipelineConfig(BaseModel):
     )
     FAL_ESTIMATED_COST_PER_CALL: float = 0.15  # Kling turbo 5s video approx cost
 
-    # Visual Generation - Scenes 1-N Cloudflare Workers AI FLUX.1 Schnell
+    # Visual Generation - Scenes 1-N AI Engines
+    SILICONFLOW_API_KEY: str = Field(default_factory=lambda: os.getenv("SILICONFLOW_API_KEY", ""))
+    SILICONFLOW_MODEL: str = Field(
+        default_factory=lambda: os.getenv("SILICONFLOW_MODEL", "black-forest-labs/FLUX.1-schnell")
+    )
     CLOUDFLARE_ACCOUNT_ID: str = Field(default_factory=lambda: os.getenv("CLOUDFLARE_ACCOUNT_ID", ""))
     CLOUDFLARE_API_TOKEN: str = Field(default_factory=lambda: os.getenv("CLOUDFLARE_API_TOKEN", ""))
     CLOUDFLARE_FLUX_MODEL: str = Field(
