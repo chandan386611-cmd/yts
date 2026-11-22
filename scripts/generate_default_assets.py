@@ -31,11 +31,21 @@ WHOOSH_PATH = ASSETS_DIR / "whoosh.mp3"
 
 
 def find_ffmpeg() -> str | None:
-    """Find ffmpeg binary from environment or PATH."""
+    """Find ffmpeg binary from environment, PATH, or WinGet packages."""
     env_ffmpeg = os.environ.get("FFMPEG_PATH")
-    if env_ffmpeg and shutil.which(env_ffmpeg):
+    if env_ffmpeg and (shutil.which(env_ffmpeg) or Path(env_ffmpeg).exists()):
         return env_ffmpeg
-    return shutil.which("ffmpeg")
+    which_bin = shutil.which("ffmpeg")
+    if which_bin:
+        return which_bin
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        winget_dir = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
+        if winget_dir.exists():
+            for candidate in winget_dir.rglob("ffmpeg.exe"):
+                if candidate.is_file():
+                    return str(candidate)
+    return None
 
 
 def generate_pure_python_mp3(file_path: Path, duration_seconds: float) -> None:

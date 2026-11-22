@@ -49,7 +49,7 @@ def probe_audio_duration(file_path: Path) -> float:
     Uses ffprobe if available, with an internal pure-Python MPEG frame parser fallback.
     """
     ffprobe_bin = config.FFPROBE_PATH
-    if shutil.which(ffprobe_bin):
+    if shutil.which(ffprobe_bin) or Path(ffprobe_bin).exists():
         try:
             cmd = [
                 ffprobe_bin,

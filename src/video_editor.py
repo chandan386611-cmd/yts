@@ -46,7 +46,7 @@ class VideoEditor:
     def _get_ffmpeg(self) -> str:
         """Locate ffmpeg binary."""
         ffmpeg_bin = config.FFMPEG_PATH
-        if shutil.which(ffmpeg_bin):
+        if shutil.which(ffmpeg_bin) or Path(ffmpeg_bin).exists():
             return ffmpeg_bin
         raise RuntimeError(
             f"FFmpeg binary not found at '{ffmpeg_bin}' or in system PATH. "
@@ -386,7 +386,7 @@ class VideoEditor:
         """
         # Check if FFmpeg is available
         ffmpeg_bin = config.FFMPEG_PATH
-        if not shutil.which(ffmpeg_bin):
+        if not (shutil.which(ffmpeg_bin) or Path(ffmpeg_bin).exists()):
             logger.warning("FFmpeg binary not found in local environment. Using OpenCV video renderer.")
             return self._render_playable_opencv_fallback(still_images, scene_audios, self.output_final_path)
 

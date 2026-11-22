@@ -44,6 +44,40 @@ except ImportError:
 logger = logging.getLogger("config")
 
 
+def _find_ffmpeg() -> str:
+    env_p = os.getenv("FFMPEG_PATH")
+    if env_p and (shutil.which(env_p) or Path(env_p).exists()):
+        return env_p
+    which_p = shutil.which("ffmpeg")
+    if which_p:
+        return which_p
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        winget_dir = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
+        if winget_dir.exists():
+            for candidate in winget_dir.rglob("ffmpeg.exe"):
+                if candidate.is_file():
+                    return str(candidate)
+    return "ffmpeg"
+
+
+def _find_ffprobe() -> str:
+    env_p = os.getenv("FFPROBE_PATH")
+    if env_p and (shutil.which(env_p) or Path(env_p).exists()):
+        return env_p
+    which_p = shutil.which("ffprobe")
+    if which_p:
+        return which_p
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        winget_dir = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
+        if winget_dir.exists():
+            for candidate in winget_dir.rglob("ffprobe.exe"):
+                if candidate.is_file():
+                    return str(candidate)
+    return "ffprobe"
+
+
 class PipelineConfig(BaseModel):
     """Immutable central pipeline configuration and constraints."""
 
@@ -150,12 +184,8 @@ class PipelineConfig(BaseModel):
     )
 
     # External Binaries
-    FFMPEG_PATH: str = Field(
-        default_factory=lambda: os.getenv("FFMPEG_PATH") or shutil.which("ffmpeg") or "ffmpeg"
-    )
-    FFPROBE_PATH: str = Field(
-        default_factory=lambda: os.getenv("FFPROBE_PATH") or shutil.which("ffprobe") or "ffprobe"
-    )
+    FFMPEG_PATH: str = Field(default_factory=_find_ffmpeg)
+    FFPROBE_PATH: str = Field(default_factory=_find_ffprobe)
 
     def init_directories(self) -> None:
         """Ensure all required pipeline directories exist on disk."""
