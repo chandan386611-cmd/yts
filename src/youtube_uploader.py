@@ -236,3 +236,34 @@ class YouTubeUploader:
         logger.info("Video ID: %s", video_id)
         logger.info("Short URL: %s", watch_url)
         return str(video_id)
+
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s")
+
+    parser = argparse.ArgumentParser(description="Upload an existing video file directly to YouTube Shorts.")
+    parser.add_argument("video_path", type=str, nargs="?", default="output/final_short.mp4", help="Path to MP4 video file (default: output/final_short.mp4)")
+    parser.add_argument("--title", type=str, default="Unsolved Ancient History Mystery #Shorts #History", help="Video title")
+    parser.add_argument("--description", type=str, default="Unsolved Ancient History Mysteries & Conspiracies. Watch till end! #Shorts #History #Mystery", help="Video description")
+    parser.add_argument("--tags", nargs="*", default=["shorts", "history", "mystery", "conspiracy"], help="Video tags")
+
+    args = parser.parse_args()
+    target_path = Path(args.video_path)
+    if not target_path.exists():
+        print(f"Error: Video file '{target_path}' not found!")
+        sys.exit(1)
+
+    uploader = YouTubeUploader()
+    script = ShortScript(
+        topic=args.title,
+        title=args.title,
+        description=args.description,
+        tags=args.tags,
+        scenes=[],
+    )
+    print(f"Uploading {target_path} to YouTube Shorts...")
+    vid_id = uploader.upload_short(target_path, script)
+    print(f"\nSUCCESS! Video is live at: https://www.youtube.com/shorts/{vid_id}")
