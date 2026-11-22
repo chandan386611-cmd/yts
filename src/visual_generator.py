@@ -287,9 +287,9 @@ class VisualGenerator:
             "image_size": "768x1024",
             "response_format": "b64_json",
         }
-        for attempt in range(2):
+        for attempt in range(1):
             try:
-                res = requests.post(url, json=payload, headers=headers, timeout=50)
+                res = requests.post(url, json=payload, headers=headers, timeout=10)
                 if res.status_code == 200:
                     data = res.json()
                     images = data.get("images", [])
