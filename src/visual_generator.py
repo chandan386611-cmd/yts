@@ -270,42 +270,6 @@ class VisualGenerator:
 
         return None
 
-    def _call_siliconflow_flux(self, prompt: str) -> bytes | None:
-        """Call SiliconFlow API for high-speed, cost-effective FLUX.1 Schnell image generation."""
-        api_key = getattr(config, "SILICONFLOW_API_KEY", "")
-        if not api_key:
-            return None
-
-        url = "https://api.siliconflow.com/v1/images/generations"
-        headers = {
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": getattr(config, "SILICONFLOW_MODEL", "black-forest-labs/FLUX.1-schnell"),
-            "prompt": prompt,
-            "image_size": "768x1024",
-            "response_format": "b64_json",
-        }
-        for attempt in range(1):
-            try:
-                res = requests.post(url, json=payload, headers=headers, timeout=10)
-                if res.status_code == 200:
-                    data = res.json()
-                    images = data.get("images", [])
-                    if images and "b64_json" in images[0]:
-                        logger.info("Successfully generated image via SiliconFlow FLUX")
-                        return base64.b64decode(images[0]["b64_json"])
-                else:
-                    logger.warning("SiliconFlow API HTTP %d: %s", res.status_code, res.text[:150])
-            except requests.RequestException as e:
-                logger.debug("SiliconFlow attempt %d failed: %s", attempt + 1, e)
-                time.sleep(1.5)
-            except Exception as e:
-                logger.debug("SiliconFlow error: %s", e)
-                break
-        return None
-
     def _call_pexels_api(self, query: str) -> bytes | None:
         """Fetch vertical high-res photography matching query from Pexels API."""
         pexels_key = getattr(config, "PEXELS_API_KEY", "")
@@ -442,15 +406,8 @@ class VisualGenerator:
         logger.info("Generating visual for Scene %d (Query: '%s')...", index, search_query)
         raw_bytes: bytes | None = None
 
-        # Tier 1: SiliconFlow FLUX.1 Schnell (High speed, cost-effective, generous free credits)
-        if getattr(config, "SILICONFLOW_API_KEY", ""):
-            try:
-                raw_bytes = self._call_siliconflow_flux(full_prompt)
-            except Exception as e:
-                logger.warning("SiliconFlow call failed for scene %d: %s", index, e)
-
-        # Tier 2: Cloudflare Workers AI FLUX (if SiliconFlow unconfigured or fails)
-        if not raw_bytes and config.CLOUDFLARE_ACCOUNT_ID and config.CLOUDFLARE_API_TOKEN:
+        # Tier 1: Cloudflare Workers AI FLUX
+        if config.CLOUDFLARE_ACCOUNT_ID and config.CLOUDFLARE_API_TOKEN:
             try:
                 raw_bytes = self._call_cloudflare_flux(full_prompt)
             except Exception as e:
