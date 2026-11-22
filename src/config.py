@@ -157,6 +157,9 @@ class PipelineConfig(BaseModel):
             "hi-IN-MadhurNeural" if os.getenv("LANGUAGE", "hinglish").lower() in ("hinglish", "hindi") else "en-US-ChristopherNeural"
         )
     )
+    VOICE_RATE: str = Field(
+        default_factory=lambda: os.getenv("VOICE_RATE", "+14%")
+    )
 
     # Visual Generation - Scene 0 Fal.ai Kling Video
     ENABLE_FAL_HOOK: bool = Field(

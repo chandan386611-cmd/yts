@@ -295,14 +295,16 @@ class VideoEditor:
                 f"{whoosh_inputs}amix=inputs={num_cuts}:normalize=0:dropout_transition=0[sfx]"
             )
             # Final 3-way audio mix: Voiceover + Ducked BG + SFX
-            # normalize=0 preserves full volume of voiceover; volume=1.2 ensures crisp clarity
+            # highpass removes mud, treble adds studio sparkle, volume=1.25 ensures punchy clarity
             filter_parts.append(
-                f"[1:a]volume=1.2[vo];[vo][bg][sfx]amix=inputs=3:duration=first:dropout_transition=0:normalize=0[aout]"
+                f"[1:a]highpass=f=80,treble=g=2.5:f=4000,volume=1.25[vo];"
+                f"[vo][bg][sfx]amix=inputs=3:duration=first:dropout_transition=0:normalize=0[aout]"
             )
         else:
             # Fallback 2-way mix without SFX
             filter_parts.append(
-                f"[1:a]volume=1.2[vo];[vo][bg]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]"
+                f"[1:a]highpass=f=80,treble=g=2.5:f=4000,volume=1.25[vo];"
+                f"[vo][bg]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[aout]"
             )
 
         filter_complex_str = ";".join(filter_parts)

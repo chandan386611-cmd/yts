@@ -118,7 +118,9 @@ class CaptionGenerator:
 
         for idx, scene in enumerate(script.scenes):
             scene_duration = scene_audios[idx][1] if idx < len(scene_audios) else 4.0
-            words = scene.narration.split()
+            # Use Romanized display_text for subtitles if present, otherwise spoken narration
+            sub_text = scene.display_text if getattr(scene, "display_text", None) else scene.narration
+            words = sub_text.split()
             if not words:
                 current_time += scene_duration
                 continue

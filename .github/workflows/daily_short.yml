@@ -66,6 +66,7 @@ jobs:
           ELEVENLABS_MODEL_ID: ${{ vars.ELEVENLABS_MODEL_ID || 'eleven_flash_v2_5' }}
           USE_EDGE_TTS_FALLBACK: ${{ vars.USE_EDGE_TTS_FALLBACK || 'true' }}
           EDGE_TTS_VOICE: ${{ vars.EDGE_TTS_VOICE || 'hi-IN-MadhurNeural' }}
+          VOICE_RATE: ${{ vars.VOICE_RATE || '+14%' }}
           LANGUAGE: ${{ vars.LANGUAGE || 'hinglish' }}
           ENABLE_FAL_HOOK: ${{ vars.ENABLE_FAL_HOOK || 'true' }}
           FAL_KEY: ${{ secrets.FAL_KEY }}

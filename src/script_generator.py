@@ -43,6 +43,7 @@ class ScenePrompt(BaseModel):
     """Individual scene script and visual direction."""
     scene_id: int
     narration: str
+    display_text: str | None = None
     visual_prompt: str
     estimated_duration: float = Field(default=4.0, description="Estimated duration in seconds")
 
@@ -94,15 +95,16 @@ def _build_system_prompt(recent_topics: list[str], niche: str) -> str:
 
     if is_hinglish:
         language_rule = (
-            "LANGUAGE REQUIREMENT (CRITICAL): Spoken narration MUST be written in natural, ultra-engaging conversational HINGLISH "
-            "(Hindi spoken in Roman/Latin English letters, exactly like viral Indian YouTubers write, e.g., 'Kya aapne kabhi notice kiya hai ki...', 'Darasal hota ye hai...'). "
-            "DO NOT write in Devanagari script; write purely in Latin/English letters so neural voiceover and subtitles render smoothly. "
-            "Title and Description should also be in high-CTR Hinglish with relevant hashtags. "
-            "CRITICAL: The 'visual_prompt' field for each scene MUST ALWAYS BE IN ENGLISH so image models understand it."
+            "LANGUAGE REQUIREMENT (CRITICAL FOR NATURAL HUMAN PRONUNCIATION):\n"
+            "1. 'narration': Spoken voiceover text. MUST be written in conversational HINDI (Devanagari script, e.g. 'क्या आपने कभी सोचा है...', 'पिरामिड्स के पीछे का असली सच...'). "
+            "You can include common English loan words in English letters (e.g., 'Pyramids', 'Secret', 'Technology', 'Science'). Devanagari guarantees the neural voice engine speaks with 100% natural, human, authentic Indian pronunciation with ZERO robotic glitches!\n"
+            "2. 'display_text': On-screen subtitle text. MUST be written in punchy Romanized HINGLISH (Hindi in English/Latin letters, e.g., 'Kya aapne kabhi socha hai...', 'Pyramids ka asli sach...'). This will be rendered as bold center-screen pop-in subtitles.\n"
+            "3. 'title' & 'description': Write in catchy, high-CTR Hinglish with relevant hashtags.\n"
+            "4. 'visual_prompt': MUST ALWAYS BE IN ENGLISH for the AI image generator."
         )
     else:
         language_rule = (
-            "LANGUAGE: All narration, title, and description MUST be written in punchy, captivating English. "
+            "LANGUAGE: All narration, display_text, title, and description MUST be written in punchy, captivating English. "
             "Visual prompts must be in English."
         )
 
@@ -110,13 +112,13 @@ def _build_system_prompt(recent_topics: list[str], niche: str) -> str:
 
 CRITICAL RETENTION & TIMING RULES:
 1. {language_rule}
-2. TOTAL SPOKEN WORDS: MUST BE STRICTLY BETWEEN {config.TARGET_MIN_WORDS} AND {config.TARGET_MAX_WORDS} WORDS TOTAL across the entire script. Spoken at a natural 150-160 WPM, this results in exactly 40.0 to 45.0 seconds of audio.
+2. TOTAL SPOKEN WORDS: MUST BE STRICTLY BETWEEN {config.TARGET_MIN_WORDS} AND {config.TARGET_MAX_WORDS} WORDS TOTAL across the entire script. Spoken at an energetic brisk pace (150-165 WPM), this results in exactly 40.0 to 45.0 seconds of audio.
 3. SCENE COUNT: EXACTLY {config.MIN_SCENES} TO {config.MAX_SCENES} DISTINCT SCENES (numbered 0 to N-1).
    - Scene 0 is THE 5-SECOND OPENING HOOK. It must ignite instant curiosity or fear of missing out, shocking the viewer in under 12 words without intro fluff.
-   - Scenes 1 to N-1 must develop the psychological mechanism, dark behavioral revelation, or counter-intuitive human truth.
-   - Scene N-1 must deliver a punchy payoff/takeaway and a subtle engagement cliffhanger (e.g., 'Kya aapne bhi kabhi notice kiya hai? Comments mein batao.').
+   - Scenes 1 to N-1 must develop the psychological mechanism, dark behavioral revelation, or counter-intuitive truth.
+   - Scene N-1 must deliver a punchy payoff/takeaway and a subtle engagement cliffhanger (e.g., 'Aapko kya lagta hai? Comments mein batao.').
 4. PACING: Each individual scene narration must be 9 to 14 words (~3.5 to 4.2 seconds).
-5. VISUAL PROMPTS: Each scene MUST have a highly atmospheric visual description in English focusing on symbolic metaphors, intense facial micro-expressions, shadows, retro-modern dark rooms, or surreal psychological motifs. Do NOT include words like 'cinematic' or 'hyper-detailed' in visual_prompt—art style will be locked automatically.
+5. VISUAL PROMPTS: Each scene MUST have a highly atmospheric visual description in English focusing on symbolic metaphors, intense facial micro-expressions, shadows, retro-modern dark rooms, or surreal motifs. Do NOT include words like 'cinematic' or 'hyper-detailed' in visual_prompt—art style will be locked automatically.
 6. STRICT DEDUPLICATION: DO NOT reuse or closely duplicate any of the following recently covered topics:
 {avoid_list if avoid_list else "(No prior topics - pick an ultra-viral breakthrough fact)"}
 
@@ -124,13 +126,14 @@ OUTPUT FORMAT:
 You MUST respond ONLY with a valid raw JSON object matching this exact structure:
 {{
   "topic": "Concise topic title",
-  "title": "Viral Hook Title Under 60 Chars #Shorts #Psychology",
-  "description": "Engaging 2-3 sentence description with high SEO keywords and hashtags #DarkPsychology #Behavior #Shorts",
-  "tags": ["psychology", "mindset", "humanbehavior", "shorts", "darkpsychology"],
+  "title": "Viral Hook Title Under 60 Chars #Shorts #History",
+  "description": "Engaging 2-3 sentence description with high SEO keywords and hashtags #History #Shorts #Mysteries",
+  "tags": ["history", "mysteries", "shorts", "conspiracy", "facts"],
   "scenes": [
     {{
       "scene_id": 0,
-      "narration": "Gripping 5-second hook narration text in Hinglish...",
+      "narration": "क्या आपने कभी सोचा है कि इजिप्ट के Pyramids सच में किसने बनाए? (Spoken Hindi for TTS)",
+      "display_text": "Kya aapne kabhi socha hai ki Egypt ke Pyramids kisne banaye? (Romanized Hinglish for subtitles)",
       "visual_prompt": "Subject and action description without style adjectives in English",
       "estimated_duration": 4.0
     }}

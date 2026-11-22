@@ -201,8 +201,9 @@ class VoiceGenerator:
         for voice in voices_to_try:
             for attempt in range(1, 4):
                 try:
-                    # Attempt 1: slight +4% pace boost; retries: standard +0%
-                    rate = "+4%" if attempt == 1 else "+0%"
+                    # Attempt 1: brisk, energetic pace (+14% by default); retries: slight fallback
+                    base_rate = getattr(config, "VOICE_RATE", "+14%")
+                    rate = base_rate if attempt == 1 else "+10%"
 
                     async def _run(v: str, r: str) -> None:
                         communicate = edge_tts.Communicate(
