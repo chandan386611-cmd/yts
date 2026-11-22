@@ -180,6 +180,7 @@ class PipelineConfig(BaseModel):
     CLOUDFLARE_FLUX_MODEL: str = Field(
         default_factory=lambda: os.getenv("CLOUDFLARE_FLUX_MODEL", "@cf/black-forest-labs/flux-1-schnell")
     )
+    PEXELS_API_KEY: str = Field(default_factory=lambda: os.getenv("PEXELS_API_KEY", ""))
 
     # YouTube Data API v3 & Publishing
     YOUTUBE_CLIENT_ID: str = Field(default_factory=lambda: os.getenv("YOUTUBE_CLIENT_ID", ""))

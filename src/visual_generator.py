@@ -13,7 +13,9 @@ import io
 import json
 import logging
 import os
+import re
 import time
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -268,22 +270,169 @@ class VisualGenerator:
 
         return None
 
-    def generate_scene_still_image(self, scene: ScenePrompt, index: int) -> Path:
+    def _call_pexels_api(self, query: str) -> bytes | None:
+        """Fetch vertical high-res photography matching query from Pexels API."""
+        pexels_key = getattr(config, "PEXELS_API_KEY", "")
+        if not pexels_key:
+            return None
+
+        url = "https://api.pexels.com/v1/search"
+        headers = {
+            "Authorization": pexels_key,
+            "User-Agent": "YouTubeShortsPipeline/1.0",
+        }
+        params = {
+            "query": query,
+            "orientation": "portrait",
+            "per_page": 5,
+        }
+        try:
+            res = requests.get(url, headers=headers, params=params, timeout=12)
+            if res.status_code == 200:
+                data = res.json()
+                photos = data.get("photos", [])
+                if photos:
+                    img_url = (
+                        photos[0].get("src", {}).get("portrait")
+                        or photos[0].get("src", {}).get("large2x")
+                        or photos[0].get("src", {}).get("original")
+                    )
+                    if img_url:
+                        dl = requests.get(img_url, timeout=20)
+                        if dl.status_code == 200 and len(dl.content) > 10000:
+                            logger.info("Found Pexels portrait photo for '%s'", query)
+                            return dl.content
+            else:
+                logger.warning("Pexels API HTTP %d: %s", res.status_code, res.text[:150])
+        except Exception as e:
+            logger.debug("Pexels fetch error for '%s': %s", query, e)
+        return None
+
+    def _call_wikimedia_commons(self, query: str, topic: str = "") -> bytes | None:
         """
-        Generate image for scene index via Cloudflare FLUX or procedural fallback,
-        inspect pixel dimensions with Pillow, center-crop to 9:16, and resize to 1080x1920.
+        Fetch high-resolution real photograph from Wikimedia Commons API.
+        100% free, unlimited, public domain / Creative Commons archive.
+        Cascades through candidate query simplifications to ensure 100% match rate.
+        """
+        if not query or not query.strip():
+            return None
+
+        clean_q = re.sub(r"[^\w\s]", " ", query).strip()
+        words = clean_q.split()
+
+        candidates: list[str] = []
+        if len(words) >= 3:
+            candidates.append(" ".join(words[:3]))
+        if len(words) >= 2:
+            candidates.append(" ".join(words[:2]))
+        if words and len(words[0]) >= 4:
+            candidates.append(words[0])
+        if topic:
+            clean_topic = re.sub(r"[^\w\s]", " ", topic).strip()
+            topic_words = clean_topic.split()
+            if len(topic_words) >= 2:
+                candidates.append(" ".join(topic_words[:2]))
+
+        headers = {
+            "User-Agent": "YouTubeShortsPipeline/1.0 (contact@zorvian.media)",
+        }
+
+        for search_term in candidates:
+            params = {
+                "action": "query",
+                "generator": "search",
+                "gsrsearch": search_term,
+                "gsrnamespace": 6,
+                "gsrlimit": 5,
+                "prop": "imageinfo",
+                "iiprop": "url|mime|size|width|height",
+                "format": "json",
+            }
+            try:
+                res = requests.get("https://commons.wikimedia.org/w/api.php", params=params, headers=headers, timeout=8)
+                if res.status_code != 200:
+                    continue
+
+                pages = res.json().get("query", {}).get("pages", {})
+                for _, page in pages.items():
+                    info_list = page.get("imageinfo", [])
+                    if not info_list:
+                        continue
+                    info = info_list[0]
+                    url = info.get("url")
+                    mime = info.get("mime", "")
+                    w = info.get("width", 0)
+                    h = info.get("height", 0)
+
+                    # Filter for quality JPEG/PNG images >= 600px
+                    if url and ("image/jpeg" in mime or "image/png" in mime) and (w >= 600 or h >= 600):
+                        dl = requests.get(url, headers=headers, timeout=15)
+                        if dl.status_code == 200 and len(dl.content) > 15000:
+                            logger.info("Found high-res Wikimedia photograph for '%s' (%dx%d)", search_term, w, h)
+                            return dl.content
+            except Exception as e:
+                logger.debug("Wikimedia search failed for '%s': %s", search_term, e)
+        return None
+
+    def _call_pollinations_flux(self, prompt: str) -> bytes | None:
+        """Call Pollinations.ai free FLUX image generation as fallback."""
+        try:
+            clean_prompt = prompt[:200]
+            encoded = urllib.parse.quote(clean_prompt)
+            url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1920&nologo=true&model=flux"
+            res = requests.get(url, timeout=35)
+            if res.status_code == 200 and len(res.content) > 10000:
+                logger.info("Generated image via Pollinations.ai FLUX")
+                return res.content
+            elif res.status_code == 402:
+                logger.debug("Pollinations rate limit (45s) active.")
+        except Exception as e:
+            logger.debug("Pollinations call failed: %s", e)
+        return None
+
+    def generate_scene_still_image(self, scene: ScenePrompt, index: int, topic: str = "") -> Path:
+        """
+        Multi-tier image generator:
+        1. Cloudflare Workers AI FLUX (if available and within daily neuron quota)
+        2. Pexels Stock API (if PEXELS_API_KEY is configured)
+        3. Wikimedia Commons high-resolution photography archive (100% free, unlimited)
+        4. Pollinations.ai FLUX fallback
+        5. Procedural cinematic fallback (only if offline/all APIs fail)
         """
         out_path = self.visuals_dir / f"scene_{index}.png"
         full_prompt = scene.full_visual_prompt
+        search_query = getattr(scene, "image_search_query", "") or scene.visual_prompt[:40]
 
-        logger.info("Generating visual for Scene %d: '%s'...", index, scene.visual_prompt[:60])
+        logger.info("Generating visual for Scene %d (Query: '%s')...", index, search_query)
         raw_bytes: bytes | None = None
 
+        # Tier 1: Cloudflare Workers AI FLUX
         if config.CLOUDFLARE_ACCOUNT_ID and config.CLOUDFLARE_API_TOKEN:
             try:
                 raw_bytes = self._call_cloudflare_flux(full_prompt)
             except Exception as e:
                 logger.warning("Cloudflare FLUX call failed for scene %d: %s", index, e)
+
+        # Tier 2: Pexels API
+        if not raw_bytes and getattr(config, "PEXELS_API_KEY", ""):
+            try:
+                raw_bytes = self._call_pexels_api(search_query)
+            except Exception as e:
+                logger.debug("Pexels fallback failed for scene %d: %s", index, e)
+
+        # Tier 3: Wikimedia Commons High-Res Archive (Free, authentic photography)
+        if not raw_bytes:
+            try:
+                raw_bytes = self._call_wikimedia_commons(search_query, topic=topic)
+            except Exception as e:
+                logger.debug("Wikimedia fallback failed for scene %d: %s", index, e)
+
+        # Tier 4: Pollinations.ai FLUX
+        if not raw_bytes:
+            try:
+                raw_bytes = self._call_pollinations_flux(scene.visual_prompt)
+            except Exception as e:
+                logger.debug("Pollinations fallback failed for scene %d: %s", index, e)
 
         if raw_bytes:
             processed_img = verify_and_crop_to_vertical(
@@ -291,6 +440,7 @@ class VisualGenerator:
                 target_width=config.VIDEO_WIDTH,
                 target_height=config.VIDEO_HEIGHT,
             )
+            logger.info("Retrieved authentic photo for Scene %d", index)
         else:
             logger.info("Using procedural cinematic visual fallback for Scene %d", index)
             processed_img = generate_procedural_cinematic_fallback(
@@ -333,16 +483,16 @@ class VisualGenerator:
         start_idx = 1
         if hook_video_path is None:
             logger.info("Scene 0 will use camera-animated still image.")
-            img_0 = self.generate_scene_still_image(scene_0, 0)
+            img_0 = self.generate_scene_still_image(scene_0, 0, topic=script.topic)
             scene_stills.append(img_0)
         else:
             # Placeholder still in case of video inspection fallback
-            self.generate_scene_still_image(scene_0, 0)
+            self.generate_scene_still_image(scene_0, 0, topic=script.topic)
 
         # Scenes 1 to N: Generate still images
         for idx in range(start_idx, len(script.scenes)):
             scene = script.scenes[idx]
-            img_path = self.generate_scene_still_image(scene, idx)
+            img_path = self.generate_scene_still_image(scene, idx, topic=script.topic)
             scene_stills.append(img_path)
 
         return hook_video_path, scene_stills

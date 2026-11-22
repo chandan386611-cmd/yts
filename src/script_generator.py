@@ -45,6 +45,7 @@ class ScenePrompt(BaseModel):
     narration: str
     display_text: str | None = None
     visual_prompt: str
+    search_query: str | None = None
     estimated_duration: float = Field(default=4.0, description="Estimated duration in seconds")
 
     @property
@@ -52,6 +53,21 @@ class ScenePrompt(BaseModel):
         """Visual prompt concatenated with mandatory art-direction style suffix."""
         cleaned = self.visual_prompt.strip().rstrip(",")
         return f"{cleaned}, {config.ART_STYLE_SUFFIX}"
+
+    @property
+    def image_search_query(self) -> str:
+        """2-4 clean keywords for retrieving relevant real-world photographs."""
+        if self.search_query and self.search_query.strip():
+            return self.search_query.strip()
+        # Fallback: extract main non-stopword tokens from visual prompt
+        tokens = re.findall(r"[A-Za-z0-9]+", self.visual_prompt)
+        stopwords = {
+            "a", "an", "the", "in", "on", "at", "by", "with", "of", "and", "or", "for",
+            "from", "to", "showing", "scene", "view", "extreme", "macro", "close", "up",
+            "wide", "shot", "high", "angle", "dramatic", "cinematic", "lighting", "under"
+        }
+        filtered = [w for w in tokens if w.lower() not in stopwords]
+        return " ".join(filtered[:3]) if filtered else "ancient mystery"
 
 
 class ShortScript(BaseModel):
@@ -135,6 +151,7 @@ You MUST respond ONLY with a valid raw JSON object matching this exact structure
       "narration": "क्या आपने कभी सोचा है कि इजिप्ट के Pyramids सच में किसने बनाए? (Spoken Hindi for TTS)",
       "display_text": "Kya aapne kabhi socha hai ki Egypt ke Pyramids kisne banaye? (Romanized Hinglish for subtitles)",
       "visual_prompt": "Subject and action description without style adjectives in English",
+      "search_query": "2-3 clean keywords for real photographic search (e.g., 'Pyramids of Giza')",
       "estimated_duration": 4.0
     }}
   ]
