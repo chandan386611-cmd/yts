@@ -73,10 +73,12 @@ class VideoEditor:
             target_duration,
         )
 
-        # Scale and crop to exact 1080x1920, set SAR 1:1, 30 fps
+        # Scale and crop to exact 1080x1920 with Lanczos interpolation, smart sharpening & contrast boost
         vf = (
-            "scale=1080:1920:force_original_aspect_ratio=increase,"
+            "scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,"
             "crop=1080:1920,"
+            "unsharp=lx=5:ly=5:la=0.8:cx=3:cy=3:ca=0.4,"
+            "eq=contrast=1.05:saturation=1.05,"
             "setsar=1,"
             "fps=30"
         )
@@ -89,7 +91,11 @@ class VideoEditor:
             "-t", f"{target_duration:.3f}",
             "-vf", vf,
             "-c:v", "libx264",
-            "-preset", "fast",
+            "-preset", "medium",
+            "-crf", "16",
+            "-b:v", "8M",
+            "-maxrate", "12M",
+            "-bufsize", "16M",
             "-pix_fmt", "yuv420p",
             "-r", str(config.VIDEO_FPS),
             "-an",
@@ -162,6 +168,8 @@ class VideoEditor:
         zoompan_filter = (
             f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':"
             f"d={total_frames}:s={config.VIDEO_WIDTH}x{config.VIDEO_HEIGHT}:fps={fps},"
+            "unsharp=lx=5:ly=5:la=0.6:cx=3:cy=3:ca=0.3,"
+            "eq=contrast=1.05:saturation=1.05,"
             "setsar=1"
         )
 
@@ -173,7 +181,11 @@ class VideoEditor:
             "-vf", zoompan_filter,
             "-t", f"{duration:.3f}",
             "-c:v", "libx264",
-            "-preset", "fast",
+            "-preset", "medium",
+            "-crf", "16",
+            "-b:v", "8M",
+            "-maxrate", "12M",
+            "-bufsize", "16M",
             "-pix_fmt", "yuv420p",
             "-r", str(fps),
             "-an",
@@ -321,7 +333,10 @@ class VideoEditor:
             "-vf", vf_filter,
             "-c:v", "libx264",
             "-preset", "medium",
-            "-crf", "19",
+            "-crf", "16",
+            "-b:v", "10M",
+            "-maxrate", "14M",
+            "-bufsize", "20M",
             "-pix_fmt", "yuv420p",
             "-c:a", "aac",
             "-b:a", "192k",

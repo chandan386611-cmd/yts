@@ -306,9 +306,19 @@ class VisualGenerator:
                 if res.status_code == 200:
                     data = res.json()
                     hits = data.get("hits", [])
-                    for hit in hits:
+                    # Rank hits: prioritize native vertical (9:16) and full 1080p height
+                    def _rank_coverr_hit(h: dict[str, Any]) -> int:
+                        score = 0
+                        if h.get("is_vertical") is True or h.get("aspect_ratio") in ("9:16", "vertical"):
+                            score += 100
+                        if h.get("max_height") and h.get("max_height") >= 1080:
+                            score += 50
+                        return score
+
+                    sorted_hits = sorted(hits, key=_rank_coverr_hit, reverse=True)
+                    for hit in sorted_hits:
                         urls = hit.get("urls", {})
-                        video_url = urls.get("mp4") or urls.get("mp4_download") or urls.get("mp4_preview")
+                        video_url = urls.get("mp4") or urls.get("mp4_download")
                         if video_url:
                             dl = requests.get(video_url, stream=True, timeout=25)
                             if dl.status_code == 200:
@@ -316,10 +326,12 @@ class VisualGenerator:
                                     for chunk in dl.iter_content(chunk_size=16384):
                                         f.write(chunk)
                                 if output_path.exists() and output_path.stat().st_size > 50000:
+                                    is_vert = hit.get("is_vertical") is True or hit.get("aspect_ratio") in ("9:16", "vertical")
                                     logger.info(
-                                        "Retrieved real 1080p Coverr video for '%s' ('%s', %.2f MB)",
+                                        "Retrieved real 1080p Coverr video for '%s' ('%s', %s, %.2f MB)",
                                         q,
-                                        hit.get("title", "clip")[:40],
+                                        hit.get("title", "clip")[:35],
+                                        "NATIVE VERTICAL" if is_vert else "HORIZONTAL HD",
                                         output_path.stat().st_size / (1024 * 1024),
                                     )
                                     return output_path
