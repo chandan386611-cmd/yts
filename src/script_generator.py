@@ -1031,7 +1031,7 @@ class ScriptGenerator:
             "Authorization": f"Bearer {self.openai_api_key}",
             "Content-Type": "application/json",
         }
-        candidate_models = [self.openai_model, "gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+        candidate_models = [self.openai_model, "gpt-4o", "gpt-4o-mini"]
         unique_models = list(dict.fromkeys([m for m in candidate_models if m]))
 
         last_error = None
@@ -1155,19 +1155,23 @@ class ScriptGenerator:
             logger.warning("GEMINI_API_KEY is not set. Using offline fallback script.")
             return generate_fallback_offline_script(config.NICHE_TOPIC)
 
-        if custom_topic:
-            selected_topic = custom_topic
+        if custom_topic and custom_topic.strip():
+            selected_topic = custom_topic.strip()
             selected_family = "User Specified Topic"
+        elif config.NICHE_TOPIC and config.NICHE_TOPIC.strip() and config.NICHE_TOPIC.strip().lower() not in ("auto", "random", "mix"):
+            # DIRECT PRIORITY: Always respect whatever the user typed in .env NICHE_TOPIC!
+            selected_topic = config.NICHE_TOPIC.strip()
+            selected_family = f"Custom Niche ({config.NICHE_TOPIC.strip()})"
         else:
             selected_topic, selected_family = select_viral_seed(recent_topics, config.NICHE_TOPIC)
 
         user_prompt = (
             f"Generate an ultra-engaging, viral YouTube Short story.\n"
-            f"STORY CONCEPT: '{selected_topic}'\n"
+            f"STORY TOPIC / NICHE: '{selected_topic}'\n"
             f"TOPIC CATEGORY: '{selected_family}'\n"
-            f"TARGET AUDIENCE RETENTION: Extreme curiosity, high watch-through rate, emotional payoff.\n"
-            f"VIRAL HOOK REQUIREMENT (1-2 SECONDS): Scene 0 narration MUST be under 12 words and immediately plunge the viewer into emotional intrigue, curiosity, or shock to stop scrolling.\n"
-            f"4-ACT STORY ARC: Follow the 4-act structure: 1) Instant Hook, 2) Rising Drama & Connection, 3) Heartbreaking Twist or Shocking Climax, 4) Poignant Payoff & Debate Cliffhanger.\n"
+            f"TARGET AUDIENCE RETENTION: Extreme curiosity, high watch-through rate, viral payoff.\n"
+            f"VIRAL HOOK REQUIREMENT (1-2 SECONDS): Scene 0 narration MUST be under 12 words and immediately plunge the viewer into shocking intrigue, curiosity, or drama about '{selected_topic}' to stop scrolling.\n"
+            f"4-ACT STORY ARC: Follow the 4-act structure: 1) Instant Hook, 2) Rising Drama/Mystery, 3) Heartbreaking Twist or Shocking Climax, 4) Poignant Payoff & Debate Cliffhanger.\n"
             f"REMINDER: Total spoken word count across ALL scenes must strictly be between {config.TARGET_MIN_WORDS} and {config.TARGET_MAX_WORDS} words."
         )
 
