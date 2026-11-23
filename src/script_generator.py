@@ -1031,7 +1031,7 @@ class ScriptGenerator:
             "Authorization": f"Bearer {self.openai_api_key}",
             "Content-Type": "application/json",
         }
-        candidate_models = [self.openai_model, "gpt-4o", "gpt-4o-mini", "chatgpt-4o-latest"]
+        candidate_models = [self.openai_model, "gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
         unique_models = list(dict.fromkeys([m for m in candidate_models if m]))
 
         last_error = None
