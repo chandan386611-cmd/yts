@@ -104,16 +104,191 @@ def load_recent_topics(max_history: int = 40) -> list[str]:
         return []
 
 
+VIRAL_TOPIC_FAMILIES: dict[str, dict[str, Any]] = {
+    "emotional_animal_stories": {
+        "family_name": "Emotional Animal & Rescue Stories",
+        "why_it_gets_views": "Universal, highly shareable, family-friendly, strong emotional payoff",
+        "hook_examples": [
+            "This stray dog waited outside a hospital every single day...",
+            "An old elephant walked 20 miles back to the village that saved it...",
+            "Every morning, a crow brought a shiny object to this lonely old man...",
+        ],
+        "topics": [
+            "A stray dog waited outside a hospital every day—until the doctors learned the heartbreaking reason.",
+            "An old elephant returned to the village that saved it 20 years ago to say goodbye.",
+            "A crow brought a shiny object to a lonely old man every morning—saving his life.",
+            "A mother cat protected her kittens during a devastating flood against all odds.",
+            "A blind rescue dog recognized its former owner's heartbeat after 7 years apart.",
+            "A horse refused to leave its injured rider trapped in the wilderness until rescue arrived.",
+            "A wild monkey guided a lost 5-year-old child through the dense jungle back to safety.",
+            "A stray dog guarded a sleeping abandoned baby in freezing rain through the night.",
+            "A full-grown lion remembered the exact human who saved its life as an orphaned cub.",
+            "A stray puppy followed a tired delivery boy for 5 kilometers—and changed his life forever.",
+        ],
+    },
+    "ai_what_if_scenarios": {
+        "family_name": "AI 'What If?' Scenarios",
+        "why_it_gets_views": "Extreme curiosity, visual spectacle, mind-bending thought experiments",
+        "hook_examples": [
+            "What if dinosaurs returned to Earth in 2026?",
+            "What if the ocean became 100% transparent for just 24 hours?",
+            "What if all animals on Earth could suddenly speak human languages for 24 hours?",
+        ],
+        "topics": [
+            "What if dinosaurs returned in 2026?",
+            "What if the ocean became transparent for one day?",
+            "What if animals could talk for 24 hours?",
+            "What if gravity disappeared for 10 seconds?",
+            "What if India had a city under the sea?",
+            "What if humans could fly like birds?",
+            "What if the Moon suddenly turned blue?",
+            "What if every animal became giant for one day?",
+            "What if a day lasted 48 hours?",
+            "What if the internet stopped working forever?",
+        ],
+    },
+    "mini_horror_mystery": {
+        "family_name": "Mini Horror & Mind-Bending Mystery",
+        "why_it_gets_views": "Strong watch-through rate, goosebumps, cliffhanger retention",
+        "hook_examples": [
+            "He received a message from himself... sent 10 years in the future.",
+            "The elevator stopped at a floor that did not exist.",
+            "The last photo on his phone was terrifying.",
+        ],
+        "topics": [
+            "He received a message from himself—sent 10 years in the future.",
+            "The lift stopped at a floor that did not exist.",
+            "Every night, the same shadow appeared outside his window.",
+            "She found a door behind her bedroom wall.",
+            "The last photo on his phone showed someone standing behind him.",
+            "A man moved into a house where every mirror showed a different room.",
+            "At 3:33 AM, his phone received a call from his own number.",
+            "The abandoned school had one classroom that was still lit.",
+            "A voice on the radio knew his name.",
+            "The CCTV showed him entering the house—but never leaving.",
+        ],
+    },
+    "cinematic_history_future": {
+        "family_name": "Cinematic History & Ancient Civilizations",
+        "why_it_gets_views": "Visual curiosity + cultural interest, awe, grand spectacle",
+        "hook_examples": [
+            "What ancient India looked like 5,000 years ago...",
+            "What if the Indus Valley civilization had modern technology?",
+            "This ancient city was hidden 85 meters underground...",
+        ],
+        "topics": [
+            "Ancient India 5,000 years ago—visualized.",
+            "What if the Indus Valley civilization had modern technology?",
+            "India in 2050: futuristic cities, trains, and AI.",
+            "What if the Taj Mahal was built today?",
+            "A day in the life of a student in 2100.",
+            "The last city on Earth after humans disappeared.",
+            "What if humans lived underwater?",
+            "What if Mars became India's second home?",
+            "What if ancient warriors had modern weapons?",
+            "The future of Mumbai in 2100.",
+        ],
+    },
+    "underdog_emotional_human": {
+        "family_name": "Underdog & Heart-Wrenching Human Stories",
+        "why_it_gets_views": "Strong emotional payoff, viral inspiration, human empathy",
+        "hook_examples": [
+            "A poor boy built a rocket from scrap—and changed his village.",
+            "An Indian soldier returned home unannounced after 5 years...",
+            "Nobody expected this homeless man was secretly saving lives...",
+        ],
+        "topics": [
+            "A poor boy built a rocket from scrap—and changed his village.",
+            "A soldier returned home after 5 years—his dog's reaction melted millions.",
+            "An impoverished tea seller secretly funded education for 40 orphan girls.",
+            "A paralyzed artist created masterpieces using only his eye movements.",
+        ],
+    },
+    "ai_comedy_relatable": {
+        "family_name": "AI Comedy & Relatable Life",
+        "why_it_gets_views": "Highly shareable, group chat virality, humorous relatable moments",
+        "hook_examples": [
+            "When your mom checks your phone at 2 AM...",
+            "When you tell your parents you want to become a YouTuber...",
+        ],
+        "topics": [
+            "When your mom finds your exam result at 2 AM.",
+            "When you tell your parents you want to become a YouTuber.",
+            "Animals trying Indian street food for the first time.",
+            "Office meeting in the year 3000.",
+            "When your friend asks for one bite of your food.",
+            "When your phone battery is at 1% and there is no charger.",
+            "When a robot tries to wake you up for school.",
+            "When your crush texts 'hi' after six months.",
+            "When your teacher says, 'This will come in the exam.'",
+            "When animals run a restaurant.",
+        ],
+    },
+}
+
+
+def select_viral_seed(recent_topics: list[str], user_niche: str = "") -> tuple[str, str]:
+    """
+    Selects the next optimal viral Short story concept, respecting past deduplication
+    and the golden channel ratio (50% Emotional Stories, 25% Horror/Mystery, 25% What-If/History).
+    Returns: (topic_title, category_name)
+    """
+    niche_low = (user_niche or "").lower().strip()
+    recent_low = [t.lower() for t in recent_topics if t]
+
+    # Check if user explicitly asked for a specific category in NICHE_TOPIC
+    target_family = None
+    if any(k in niche_low for k in ["animal", "pet", "dog", "cat", "elephant"]):
+        target_family = "emotional_animal_stories"
+    elif any(k in niche_low for k in ["horror", "mystery", "scary", "ghost", "creepy"]):
+        target_family = "mini_horror_mystery"
+    elif any(k in niche_low for k in ["what if", "what-if", "dinosaur", "ocean"]):
+        target_family = "ai_what_if_scenarios"
+    elif any(k in niche_low for k in ["history", "ancient", "civilization", "india", "mumbai"]):
+        target_family = "cinematic_history_future"
+    elif any(k in niche_low for k in ["underdog", "poor boy", "human", "soldier"]):
+        target_family = "underdog_emotional_human"
+    elif any(k in niche_low for k in ["comedy", "funny", "relatable", "mom"]):
+        target_family = "ai_comedy_relatable"
+
+    if target_family and target_family in VIRAL_TOPIC_FAMILIES:
+        candidates = VIRAL_TOPIC_FAMILIES[target_family]["topics"]
+        for topic in candidates:
+            if not any(topic.lower()[:20] in r for r in recent_low):
+                return topic, VIRAL_TOPIC_FAMILIES[target_family]["family_name"]
+        return candidates[0], VIRAL_TOPIC_FAMILIES[target_family]["family_name"]
+
+    # Golden channel mix: 50% Emotional Animal & Human, 25% Horror/Mystery, 25% What-If/History
+    import random
+    roll = random.random()
+    if roll < 0.50:
+        family_keys = ["emotional_animal_stories", "underdog_emotional_human"]
+    elif roll < 0.75:
+        family_keys = ["mini_horror_mystery"]
+    else:
+        family_keys = ["ai_what_if_scenarios", "cinematic_history_future", "ai_comedy_relatable"]
+
+    for f_key in family_keys:
+        cand_list = VIRAL_TOPIC_FAMILIES[f_key]["topics"]
+        for cand in cand_list:
+            if not any(cand.lower()[:20] in r for r in recent_low):
+                return cand, VIRAL_TOPIC_FAMILIES[f_key]["family_name"]
+
+    # Default to first emotional animal story
+    first_fam = "emotional_animal_stories"
+    return VIRAL_TOPIC_FAMILIES[first_fam]["topics"][0], VIRAL_TOPIC_FAMILIES[first_fam]["family_name"]
+
+
 def _build_system_prompt(recent_topics: list[str], niche: str) -> str:
-    """Build the strict system instructions for Gemini."""
+    """Build the strict viral storytelling system instructions for Gemini."""
     avoid_list = "\n".join(f"- {t}" for t in recent_topics if t)
     is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
 
     if is_hinglish:
         language_rule = (
             "LANGUAGE & AUDIO DYNAMICS REQUIREMENT (CRITICAL FOR VIRAL RETENTION):\n"
-            "1. 'narration': Spoken voiceover text. MUST be written in natural, cinematic conversational HINDI (Devanagari script, e.g. 'इमेजिन कीजिए...', 'दरअस्ल एक खौफनाक सच यह है...'). "
-            "You can include common English loan words in English letters (e.g., 'Brain', 'Secret', 'Dark Psychology', 'Mirroring Trap').\n"
+            "1. 'narration': Spoken voiceover text. MUST be written in natural, cinematic conversational HINDI (Devanagari script, e.g. 'इमेजिन कीजिए...', 'एक आवारा कुत्ता हर दिन...', 'दरअस्ल एक खौफनाक सच यह है...'). "
+            "You can include common English loan words in English letters (e.g., 'Hospital', 'Doctor', 'Dinosaurs', 'Phone', 'Secret', 'Alien').\n"
             "   AUDIO PUNCTUATION RULES (MANDATORY FOR STUDIO VOCAL DELIVERY):\n"
             "   - Use '...' (ellipses) before shocking revelations, twists, and dramatic pauses (creates a natural 300ms suspense pause in neural audio).\n"
             "   - Use ',' (commas) after conversational openers and natural breathing points.\n"
@@ -121,9 +296,9 @@ def _build_system_prompt(recent_topics: list[str], niche: str) -> str:
             "   - Use '—' (em-dashes) for sudden mid-sentence mental pivots.\n"
             "   - Use '!' selectively for impactful punchlines.\n"
             "   - Use '।' (purna viram) or '.' for clean, confident sentence conclusions.\n"
-            "2. 'display_text': On-screen subtitle text. MUST be written in punchy Romanized HINGLISH (Hindi in English/Latin letters, e.g., 'Imagine kijiye...', 'Ek khaufnaak sach...').\n"
+            "2. 'display_text': On-screen subtitle text. MUST be written in punchy Romanized HINGLISH (Hindi in English/Latin letters, e.g., 'Imagine kijiye...', 'Ek kutta har din...').\n"
             "3. 'title' & 'description': Write in high-CTR, high-curiosity Hinglish with viral hashtags.\n"
-            "4. 'search_query': MUST BE 2-3 CLEAN ENGLISH KEYWORDS matching real stock video footage (e.g., 'interrogation', 'shadow', 'human eye', 'people talking', 'dark room', 'chess', 'night walking').\n"
+            "4. 'search_query': MUST BE 2-3 CLEAN ENGLISH KEYWORDS matching real stock video footage (e.g., 'stray dog', 'hospital entrance', 'sad dog', 'doctor walking', 'happy dog', 'deep sea', 'dinosaur', 'dark room').\n"
             "5. 'visual_prompt': MUST ALWAYS BE IN ENGLISH for the AI video generator."
         )
     else:
@@ -133,21 +308,31 @@ def _build_system_prompt(recent_topics: list[str], niche: str) -> str:
         )
 
     niche_words = re.findall(r"[A-Za-z]+", niche)
-    clean_tag = niche_words[0].capitalize() if niche_words else "Facts"
+    clean_tag = niche_words[0].capitalize() if niche_words else "Viral"
 
-    return f"""You are an elite Hollywood documentary filmmaker and viral YouTube Shorts thriller writer in the niche: '{niche}'.
-Your scripts do NOT sound like dry textbooks, Wikipedia articles, or academic lectures. Instead, you craft intense, addictive micro-thrillers inspired by Christopher Nolan and high-retention documentary mysteries.
+    return f"""You are an elite YouTube Shorts visual storyteller and Hollywood scriptwriter specializing in viral high-retention micro-stories in: '{niche}'.
+Your stories are emotionally captivating, suspenseful, and human. They NEVER sound like dry encyclopedias, Wikipedia articles, or corporate advertisements.
 
-CRITICAL 4-BEAT THRILLER STORYTELLING ARC:
-1. Beat 1: The Shocking Cold Open (Scene 0)
-   - Under 13 words. Shatter common sense or warn the viewer about an invisible reality or mind-blowing breakthrough in '{niche}'.
-   - ZERO fluff, no 'Hello friends' or intro titles.
-2. Beat 2: The Deepening Mystery & The Hidden Mechanism (Scenes 1 to 3)
-   - Unfold the classified experiment, futuristic technology, cosmic anomaly, or hidden mechanism with sensory tension.
-3. Beat 3: The Chilling Twist & Reality Shift (Scenes 4 to 6)
-   - The mind-blowing realization: this changes everything we thought we knew about our world, brain, or future.
-4. Beat 4: The Provocative Cliffhanger & Comment Trigger (Scenes 7 to N-1)
-   - Give the viewer a thought-provoking perspective or question that forces them to comment and debate.
+CRITICAL VIRAL HOOK FORMULA (FIRST 1-2 SECONDS - SCENE 0):
+YouTube specifically emphasizes that the first 1-2 seconds determine whether a Shorts viewer stays or scrolls away.
+- Scene 0 narration MUST be under 12 words and immediately plunge the viewer into high-stakes drama, mystery, or deep emotion.
+- Proven viral hook structures to use:
+  * "एक आवारा कुत्ता हर दिन इस अस्पताल के बाहर बैठता था... वजह बहुत दर्दनाक थी।" (Emotional Animal)
+  * "इमेजिन कीजिए... 2026 में अचानक धरती पर डायनासोर वापस लौट आएं।" (What-If Scenario)
+  * "रात के 3:33 बजे... उसके फोन पर उसी के नंबर से एक खौफनाक कॉल आई।" (Mini Horror/Mystery)
+  * "कचरे के ढेर से कलपुर्जे उठाकर... इस गरीब लड़के ने पूरे गांव की किस्मत बदल दी।" (Underdog Inspiration)
+  * "5,000 साल पहले... हमारा भारत असलियत में कैसा दिखता था?" (Cinematic Ancient History)
+- ZERO fluff, no 'Hello friends', no channel intros, no filler.
+
+THE 4-ACT VIRAL STORYTELLING STRUCTURE:
+1. Act 1: The Instant Hook (Scene 0)
+   - Curiosity spike or emotional shock that halts scrolling instantly (<12 words).
+2. Act 2: The Rising Journey / Deepening Drama (Scenes 1 to 3)
+   - Introduce the struggle, the loyal animal, the uncanny clue, or the strange phenomenon.
+3. Act 3: The Heartbreaking Twist / Shocking Climax (Scenes 4 to 6)
+   - The emotional reveal, the mind-blowing realization, or the chilling turn of events.
+4. Act 4: The Emotional Payoff & Debate Cliffhanger (Scenes 7 to N-1)
+   - The tearjerker resolution or philosophical question ending on a comment trigger that forces viewers to debate and share.
 
 CRITICAL RETENTION & TIMING RULES:
 1. {language_rule}
@@ -155,7 +340,7 @@ CRITICAL RETENTION & TIMING RULES:
 3. SCENE COUNT: EXACTLY {config.MIN_SCENES} TO {config.MAX_SCENES} DISTINCT SCENES (numbered 0 to N-1).
 4. PACING: Each individual scene narration must be 9 to 14 words (~3.5 to 4.2 seconds).
 5. STRICT DEDUPLICATION: DO NOT reuse or closely duplicate any of the following recently covered topics:
-{avoid_list if avoid_list else "(No prior topics - pick an ultra-viral breakthrough fact)"}
+{avoid_list if avoid_list else "(No prior topics - pick an ultra-viral breakthrough story)"}
 
 OUTPUT FORMAT:
 You MUST respond ONLY with a valid raw JSON object matching this exact structure:
@@ -167,10 +352,10 @@ You MUST respond ONLY with a valid raw JSON object matching this exact structure
   "scenes": [
     {{
       "scene_id": 0,
-      "narration": "इमेजिन कीजिए... कोई बात करते वक्त, चुपचाप आपका दिमाग स्कैन कर रहा है।",
-      "display_text": "Imagine kijiye... koi baat karte waqt chupchap aapka dimag scan kar raha hai.",
+      "narration": "एक आवारा कुत्ता हर दिन एक अस्पताल के बाहर बैठता था...",
+      "display_text": "Ek stray dog har din ek hospital ke bahar baithta tha...",
       "visual_prompt": "Cinematic visual description in English for AI video generator",
-      "search_query": "stock video keywords",
+      "search_query": "stray dog hospital",
       "estimated_duration": 4.1
     }}
   ]
@@ -214,7 +399,100 @@ def generate_fallback_offline_script(niche: str) -> ShortScript:
     niche_lower = (niche or "").lower()
     is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
 
-    # 1. Science, Future & Technology Niche
+    # 1. Emotional Animal & Rescue Stories Niche (stray dog, loyalty, animal rescue)
+    if any(k in niche_lower for k in ["animal", "pet", "dog", "cat", "elephant", "hospital", "stray", "rescue", "loyal", "emotional"]):
+        if is_hinglish:
+            scenes = [
+                ScenePrompt(
+                    scene_id=0,
+                    narration="एक वफादार कुत्ता रोज अस्पताल बाहर बैठता... वजह बहुत दर्दनाक थी।",
+                    display_text="Ek wafadar kutta roz hospital bahar baithta... wajah dardnak thi.",
+                    visual_prompt="Loyal stray dog sitting quietly outside modern city hospital entrance",
+                    search_query="stray dog",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=1,
+                    narration="कड़ाके की ठंड हो या बारिश, वो कभी अपनी जगह नहीं छोड़ता।",
+                    display_text="Kadake ki thand ho ya barish, wo kabhi apni jagah nahi chhodta.",
+                    visual_prompt="Wet lonely stray dog sitting patiently on wet street sidewalk in rain",
+                    search_query="dog rain",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=2,
+                    narration="अस्पताल के डॉक्टर्स उसे खाना देते, पर वो हमेशा उदास रहता।",
+                    display_text="Hospital ke doctors use khana dete, par wo hamesha udaas rehta.",
+                    visual_prompt="Doctor in white coat giving food gently to a gentle street dog",
+                    search_query="hospital staff",
+                    estimated_duration=3.9,
+                ),
+                ScenePrompt(
+                    scene_id=3,
+                    narration="एक दिन एक नर्स ने अस्पताल के पुराने सीसीटीवी फुटेज देखे।",
+                    display_text="Ek din ek nurse ne hospital ke purane CCTV footage dekhe.",
+                    visual_prompt="Security room monitors glowing showing security camera playback",
+                    search_query="cctv camera",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=4,
+                    narration="और जो सच सामने आया... उसने पूरे स्टाफ की आंखें नम कर दीं।",
+                    display_text="Aur jo sach saamne aaya... usne poore staff ki aankhein nam kar din.",
+                    visual_prompt="Hospital nurse wiping tears looking with deep emotion",
+                    search_query="sad nurse",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=5,
+                    narration="छह महीने पहले, एक बेघर बुजुर्ग को यहां भर्ती कराया गया था।",
+                    display_text="Chhe mahine pehle, ek beghar buzurga ko yahan admit karaya gaya tha.",
+                    visual_prompt="Elderly homeless man with gentle warm eyes sitting with pet",
+                    search_query="elderly man",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=6,
+                    narration="वो बुजुर्ग उस कुत्ते का मालिक था, जिसकी उसी रात मौत हो गई।",
+                    display_text="Wo buzurga us kutte ka maalik tha, jiski usi raat maut ho gayi.",
+                    visual_prompt="Shadowy hospital corridor with dim ambient blue night lighting",
+                    search_query="hospital corridor",
+                    estimated_duration=4.1,
+                ),
+                ScenePrompt(
+                    scene_id=7,
+                    narration="बेजुबान जानवर को लगा... उसका मालिक आज भी अंदर इलाज करवा रहा है।",
+                    display_text="Bezubaan janwar ko laga... uska maalik aaj bhi andar ilaaj karwa raha hai.",
+                    visual_prompt="Dog looking up faithfully through large glass sliding hospital doors",
+                    search_query="dog waiting",
+                    estimated_duration=4.2,
+                ),
+                ScenePrompt(
+                    scene_id=8,
+                    narration="इंसान भले भूल जाएं, लेकिन जानवरों की वफादारी कभी खत्म नहीं होती।",
+                    display_text="Insaan bhale bhool jayein, par janwaron ki wafadari kabhi khatam nahi hoti.",
+                    visual_prompt="Golden retriever dog running happily in green sunlight meadow",
+                    search_query="golden retriever",
+                    estimated_duration=4.0,
+                ),
+                ScenePrompt(
+                    scene_id=9,
+                    narration="क्या जानवरों में इंसानों से ज्यादा प्यार है? कमेंट्स में जरूर बताइए।",
+                    display_text="Kya janwaron mein insaano se zyada pyar hai? Comments mein zaroor batayein.",
+                    visual_prompt="Person hugging gentle dog with deep love at sunset",
+                    search_query="dog loving human",
+                    estimated_duration=4.3,
+                ),
+            ]
+            return ShortScript(
+                topic="The Loyal Dog Waiting Outside Hospital Gate",
+                title="Kutte Ne Hospital Ke Bahar Kyun Intezar Kiya? 🥺 #Shorts #DogStory #Emotional",
+                description="Ek awara kutta har din hospital ke bahar baithta tha. Doctors ne jab sach jana toh unki aankhein bhar aayin! #Emotional #Shorts #Dogs #DogLove #Viral",
+                tags=["dog", "emotional", "animals", "shorts", "story", "viral", "heartbreaking"],
+                scenes=scenes,
+            )
+
+    # 2. Science, Future & Technology Niche
     if any(k in niche_lower for k in ["tech", "science", "future", "ai", "robot", "quantum", "cyber", "digital"]):
         if is_hinglish:
             scenes = [
@@ -728,12 +1006,66 @@ def generate_fallback_offline_script(niche: str) -> ShortScript:
 
 
 class ScriptGenerator:
-    """Manages Gemini API client communication and script generation."""
+    """Manages ChatGPT (OpenAI) and Gemini API client communication and script generation."""
 
-    def __init__(self, api_key: str | None = None, model: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        openai_api_key: str | None = None,
+        openai_model: str | None = None,
+    ) -> None:
         self.api_key = api_key or config.GEMINI_API_KEY
         self.model_name = model or config.GEMINI_MODEL
+        self.openai_api_key = openai_api_key or config.OPENAI_API_KEY
+        self.openai_model = openai_model or config.OPENAI_MODEL
         self._client: Any = None
+
+    def _call_openai_api(self, prompt: str, system_instruction: str) -> str:
+        """Call OpenAI ChatGPT API (gpt-4o, gpt-4o-mini) with structured JSON output."""
+        if not self.openai_api_key:
+            raise ValueError("OPENAI_API_KEY is not set.")
+
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {self.openai_api_key}",
+            "Content-Type": "application/json",
+        }
+        candidate_models = [self.openai_model, "gpt-4o", "gpt-4o-mini", "chatgpt-4o-latest"]
+        unique_models = list(dict.fromkeys([m for m in candidate_models if m]))
+
+        last_error = None
+        for model in unique_models:
+            try:
+                payload = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.8,
+                }
+                res = requests.post(url, headers=headers, json=payload, timeout=45)
+                if res.status_code == 200:
+                    data = res.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        content = choices[0].get("message", {}).get("content", "")
+                        if content and content.strip():
+                            if self.openai_model != model:
+                                logger.info("OpenAI model '%s' succeeded. Upgraded active model.", model)
+                            self.openai_model = model
+                            return content
+                    raise RuntimeError(f"No candidate choices returned by OpenAI model {model}")
+                else:
+                    raise RuntimeError(f"HTTP {res.status_code}: {res.text[:140]}")
+            except Exception as e:
+                logger.warning("OpenAI model '%s' failed (%s). Cascading to next model...", model, str(e)[:100])
+                last_error = e
+                continue
+
+        raise RuntimeError(f"All OpenAI models exhausted. Last error: {last_error}")
 
     def _get_client(self) -> Any:
         """Lazily initialize Google GenAI or GenerativeAI client."""
@@ -823,15 +1155,49 @@ class ScriptGenerator:
             logger.warning("GEMINI_API_KEY is not set. Using offline fallback script.")
             return generate_fallback_offline_script(config.NICHE_TOPIC)
 
-        user_prompt = f"Generate an ultra-engaging, viral YouTube Short in the niche '{config.NICHE_TOPIC}'."
         if custom_topic:
-            user_prompt += f" Focus specifically on the topic: '{custom_topic}'."
+            selected_topic = custom_topic
+            selected_family = "User Specified Topic"
         else:
-            user_prompt += f" Pick a shocking, mind-blowing, little-known breakthrough fact or mystery in '{config.NICHE_TOPIC}' that triggers extreme curiosity and sharing."
+            selected_topic, selected_family = select_viral_seed(recent_topics, config.NICHE_TOPIC)
 
-        user_prompt += f"\nREMINDER: Total spoken word count across ALL scenes must strictly be between {config.TARGET_MIN_WORDS} and {config.TARGET_MAX_WORDS} words."
+        user_prompt = (
+            f"Generate an ultra-engaging, viral YouTube Short story.\n"
+            f"STORY CONCEPT: '{selected_topic}'\n"
+            f"TOPIC CATEGORY: '{selected_family}'\n"
+            f"TARGET AUDIENCE RETENTION: Extreme curiosity, high watch-through rate, emotional payoff.\n"
+            f"VIRAL HOOK REQUIREMENT (1-2 SECONDS): Scene 0 narration MUST be under 12 words and immediately plunge the viewer into emotional intrigue, curiosity, or shock to stop scrolling.\n"
+            f"4-ACT STORY ARC: Follow the 4-act structure: 1) Instant Hook, 2) Rising Drama & Connection, 3) Heartbreaking Twist or Shocking Climax, 4) Poignant Payoff & Debate Cliffhanger.\n"
+            f"REMINDER: Total spoken word count across ALL scenes must strictly be between {config.TARGET_MIN_WORDS} and {config.TARGET_MAX_WORDS} words."
+        )
 
-        logger.info("Requesting script from Gemini for niche '%s' using model '%s'...", config.NICHE_TOPIC, self.model_name)
+        use_openai = bool(self.openai_api_key and config.SCRIPT_PROVIDER in ("openai", "chatgpt"))
+        if use_openai:
+            logger.info(
+                "Requesting script from ChatGPT (%s) | Concept: '%s' | Category: '%s'",
+                self.openai_model,
+                selected_topic,
+                selected_family,
+            )
+            try:
+                raw_text = self._call_openai_api(user_prompt, system_instruction)
+                script = _parse_gemini_response(raw_text)
+                logger.info(
+                    "Successfully generated script with ChatGPT: '%s' (%d scenes, %d words)",
+                    script.topic,
+                    len(script.scenes),
+                    script.total_words,
+                )
+                return script
+            except Exception as e:
+                logger.error("ChatGPT script generation failed (%s). Cascading to Gemini...", e)
+
+        logger.info(
+            "Requesting script from Gemini using model '%s' | Concept: '%s' | Category: '%s'",
+            self.model_name,
+            selected_topic,
+            selected_family,
+        )
         try:
             raw_text = self._call_gemini_api(user_prompt, system_instruction)
             script = _parse_gemini_response(raw_text)
@@ -853,7 +1219,7 @@ class ScriptGenerator:
         target_range: tuple[float, float] = (40.0, 45.0),
     ) -> ShortScript:
         """
-        Re-prompts Gemini with explicit expansion or compression guidance
+        Re-prompts ChatGPT or Gemini with explicit expansion or compression guidance
         when measured audio duration falls outside the strict 40.0-45.0s window.
         """
         min_dur, max_dur = target_range
@@ -885,16 +1251,18 @@ class ScriptGenerator:
             )
 
         logger.info(
-            "Duration feedback triggered (%s): Audio took %.2fs (target: %.1f-%.1fs). Re-prompting Gemini...",
+            "Duration feedback triggered (%s): Audio took %.2fs (target: %.1f-%.1fs). Re-prompting AI...",
             adjustment_type,
             actual_duration,
             min_dur,
             max_dur,
         )
 
-        if not self.api_key:
+        use_openai = bool(self.openai_api_key and config.SCRIPT_PROVIDER in ("openai", "chatgpt"))
+
+        if not self.api_key and not self.openai_api_key:
             # If no API key, programmatically adjust word count on fallback
-            logger.info("API key unset during re-prompt; returning previous script.")
+            logger.info("API keys unset during re-prompt; returning previous script.")
             return previous_script
 
         recent_topics = load_recent_topics(max_history=40)
@@ -908,7 +1276,10 @@ PREVIOUS SCRIPT JSON TO REVISE:
 Respond ONLY with the revised raw JSON object with the adjusted narrations."""
 
         try:
-            raw_text = self._call_gemini_api(reprompt_prompt, system_instruction)
+            if use_openai:
+                raw_text = self._call_openai_api(reprompt_prompt, system_instruction)
+            else:
+                raw_text = self._call_gemini_api(reprompt_prompt, system_instruction)
             revised_script = _parse_gemini_response(raw_text)
             logger.info(
                 "Revised script generated: %d scenes, %d words (was %d words)",

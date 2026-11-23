@@ -136,7 +136,12 @@ class PipelineConfig(BaseModel):
         default_factory=lambda: float(os.getenv("BG_MUSIC_VOLUME_DB", "-22.0"))
     )
 
-    # Script Generation (Google Gemini)
+    # Script Generation (ChatGPT OpenAI & Google Gemini)
+    SCRIPT_PROVIDER: str = Field(
+        default_factory=lambda: os.getenv("SCRIPT_PROVIDER", "openai" if os.getenv("OPENAI_API_KEY") else "gemini").lower()
+    )
+    OPENAI_API_KEY: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+    OPENAI_MODEL: str = Field(default_factory=lambda: os.getenv("OPENAI_MODEL", "gpt-4o"))
     GEMINI_API_KEY: str = Field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
     GEMINI_MODEL: str = Field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-flash-lite-latest"))
 
