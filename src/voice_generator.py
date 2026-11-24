@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -125,6 +126,21 @@ class VoiceGenerator:
         self.temp_audio_dir = config.TEMP_DIR / "audio"
         self.temp_audio_dir.mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def _format_cartesia_script(text: str) -> str:
+        """Format script for natural Cartesia Sonic pauses and pronunciation."""
+        if "<break" in text:
+            return text
+        formatted = text.strip()
+        # Add 450ms pause after questions
+        formatted = re.sub(r"\?\s+", '? <break time="450ms"/> ', formatted)
+        # Add 400ms pause after exclamation marks
+        formatted = re.sub(r"!\s+", '! <break time="400ms"/> ', formatted)
+        # Replace mid-sentence ellipses with commas to prevent unnatural multi-second dead silences
+        formatted = re.sub(r"\.{3,}", ", ", formatted)
+        formatted = re.sub(r"\s{2,}", " ", formatted)
+        return formatted
+
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1.2, min=2, max=8),
@@ -140,6 +156,7 @@ class VoiceGenerator:
         if not clean_text:
             return False
 
+        formatted_text = self._format_cartesia_script(clean_text)
         is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
         url = "https://api.cartesia.ai/tts/bytes"
         headers = {
@@ -147,20 +164,26 @@ class VoiceGenerator:
             "Cartesia-Version": "2024-06-10",
             "Content-Type": "application/json",
         }
+        # Preferred models: sonic-latest (active) with fallback to sonic-2/sonic
+        active_model = getattr(config, "CARTESIA_MODEL", "sonic-latest")
+        if "sonic-2" in active_model.lower():
+            active_model = "sonic-latest"
+
         payload = {
-            "model_id": getattr(config, "CARTESIA_MODEL", "sonic-latest"),
-            "transcript": clean_text,
+            "model_id": active_model,
+            "transcript": formatted_text,
             "voice": {
                 "mode": "id",
                 "id": getattr(config, "CARTESIA_VOICE_ID", "7e8cb11d-37af-476b-ab8f-25da99b18644"),
-                "controls": {
-                    "speed": 1.15,
+                "__experimental_controls": {
+                    "speed": 0.08,
+                    "emotion": ["curiosity:high", "positivity:low"],
                 },
             },
             "output_format": {
-                "container": "mp3",
+                "container": "wav",
+                "encoding": "pcm_s16le",
                 "sample_rate": 44100,
-                "bit_rate": 128000,
             },
             "language": "hi" if is_hinglish else "en",
         }
@@ -168,8 +191,29 @@ class VoiceGenerator:
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=30)
             if response.status_code == 200 and len(response.content) > 500:
-                with open(output_path, "wb") as f:
+                raw_wav_path = output_path.with_suffix(".raw.wav")
+                with open(raw_wav_path, "wb") as f:
                     f.write(response.content)
+
+                # FFmpeg Post-Processing: trim leading/trailing silence + loudnorm -14 LUFS studio standard
+                ffmpeg_bin = getattr(config, "FFMPEG_PATH", "ffmpeg") or "ffmpeg"
+                cmd = [
+                    ffmpeg_bin, "-y",
+                    "-i", str(raw_wav_path),
+                    "-af", "silenceremove=start_periods=1:start_threshold=-50dB,loudnorm=I=-14:TP=-1.5:LRA=11",
+                    "-c:a", "libmp3lame",
+                    "-b:a", "192k",
+                    str(output_path),
+                ]
+                try:
+                    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    if raw_wav_path.exists():
+                        raw_wav_path.unlink()
+                except Exception as e:
+                    logger.debug("FFmpeg normalization fallback: writing raw audio directly (%s)", e)
+                    if not output_path.exists() or output_path.stat().st_size == 0:
+                        with open(output_path, "wb") as f:
+                            f.write(response.content)
                 return True
             elif response.status_code in (401, 402, 429):
                 logger.warning(
