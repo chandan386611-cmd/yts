@@ -1048,8 +1048,10 @@ class ScriptGenerator:
                         {"role": "user", "content": prompt},
                     ],
                     "response_format": {"type": "json_object"},
-                    "temperature": 0.8,
                 }
+                # Newer models like gpt-6-luna and reasoning series only support default temperature
+                if not any(k in model.lower() for k in ["luna", "o1", "o3", "reasoning"]):
+                    payload["temperature"] = 0.8
                 res = requests.post(url, headers=headers, json=payload, timeout=45)
                 if res.status_code == 200:
                     data = res.json()
