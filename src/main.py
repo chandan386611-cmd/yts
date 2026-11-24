@@ -101,6 +101,7 @@ def run_pipeline(
     custom_topic: str | None = None,
     keep_temp: bool = False,
     force_edge_tts: bool = False,
+    custom_script: ShortScript | None = None,
 ) -> int:
     """
     Executes the automated Shorts generation and publishing pipeline.
@@ -127,7 +128,11 @@ def run_pipeline(
         # 2. Topic deduplication & Structured Script Generation
         logger.info("--- STAGE 1: SCRIPT & VISUAL PROMPT GENERATION ---")
         script_gen = ScriptGenerator()
-        initial_script = script_gen.generate_script(custom_topic=custom_topic)
+        if custom_script:
+            initial_script = custom_script
+            logger.info("Using user-provided custom script: '%s'", initial_script.topic)
+        else:
+            initial_script = script_gen.generate_script(custom_topic=custom_topic)
         logger.info("Topic: '%s'", initial_script.topic)
         logger.info("Title: '%s'", initial_script.title)
         logger.info("Scenes: %d | Total Words: %d", len(initial_script.scenes), initial_script.total_words)

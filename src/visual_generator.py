@@ -687,12 +687,14 @@ class VisualGenerator:
 
         logger.info("Generating visual for Scene %d (Query: '%s')...", index, search_query)
 
-        # For gaming, CGI, and hyper-specific creative topics, stock footage libraries (Coverr/Mixkit)
-        # return irrelevant generic clips (e.g. random soccer players or office workers).
+        # For gaming, space, sci-fi, CGI, and hyper-specific creative topics, stock footage libraries (Coverr/Mixkit)
+        # return irrelevant generic clips (e.g. random sunbathers on a beach or office workers).
         # Bypass stock footage and use Fal.ai FLUX 1080x1920 vertical photorealistic generation.
         is_gaming_or_fiction = any(k in (topic + " " + search_query + " " + scene.visual_prompt).lower() for k in [
             "gta", "game", "gaming", "rockstar", "vice", "leonida", "budget",
-            "character", "animation", "3d", "cgi", "developer", "indian", "studio", "bangalore"
+            "character", "animation", "3d", "cgi", "developer", "indian", "studio", "bangalore",
+            "sun", "space", "earth", "planet", "galaxy", "orbit", "solar", "astronomy",
+            "universe", "disappear", "frozen", "darkness", "cosmos", "moon", "star", "what if"
         ])
 
         if not is_gaming_or_fiction:
