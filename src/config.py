@@ -125,8 +125,8 @@ class PipelineConfig(BaseModel):
     TARGET_MAX_WORDS: int = Field(
         default_factory=lambda: int(os.getenv("TARGET_MAX_WORDS", "120"))
     )
-    MIN_SCENES: int = 10
-    MAX_SCENES: int = 15
+    MIN_SCENES: int = 7
+    MAX_SCENES: int = 10
 
     # Video Output Specifications
     VIDEO_WIDTH: int = 1080
@@ -175,7 +175,7 @@ class PipelineConfig(BaseModel):
 
     # Visual Generation - Scene 0 Fal.ai Kling Video
     ENABLE_FAL_HOOK: bool = Field(
-        default_factory=lambda: os.getenv("ENABLE_FAL_HOOK", "true").lower() in ("true", "1", "yes")
+        default_factory=lambda: os.getenv("ENABLE_FAL_HOOK", "false").lower() in ("true", "1", "yes")
     )
     FAL_KEY: str = Field(default_factory=lambda: os.getenv("FAL_KEY", ""))
     FAL_DAILY_BUDGET_USD: float = Field(
