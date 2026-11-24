@@ -50,7 +50,10 @@ def generate_ass_header() -> str:
     # White: &H00FFFFFF
     # Bright Yellow: &H0000FFFF (BB=00, GG=FF, RR=FF)
     # Outline Black: &H00000000
-    # Shadow Semi-transparent: &H80000000
+    # Shadow Deep Black: &HA0000000
+    # Alignment: 2 (Bottom-Center)
+    # MarginV: 380 (Sweet Spot: above bottom YouTube UI, below center face area)
+    # MarginL: 60, MarginR: 180 (Safely clears YouTube right-side like/comment buttons)
     return """[Script Info]
 Title: Dynamic YouTube Shorts Captions
 ScriptType: v4.00+
@@ -62,8 +65,8 @@ PlayResY: 1920
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: ShortsDefault,Arial Black,76,&H00FFFFFF,&H000000FF,&H00000000,&H90000000,-1,0,0,0,100,100,2,0,1,7,4,5,60,60,980,1
-Style: ShortsHighlight,Arial Black,80,&H0000FFFF,&H000000FF,&H00000000,&H90000000,-1,0,0,0,105,105,2,0,1,8,4,5,60,60,980,1
+Style: ShortsDefault,Arial Black,82,&H00FFFFFF,&H000000FF,&H00000000,&HA0000000,-1,0,0,0,100,100,2,0,1,8,4,2,60,180,380,1
+Style: ShortsHighlight,Arial Black,84,&H0000FFFF,&H000000FF,&H00000000,&HA0000000,-1,0,0,0,105,105,2,0,1,8,4,2,60,180,380,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -146,48 +149,54 @@ class CaptionGenerator:
         output_file: Path | None = None,
     ) -> Path:
         """
-        Groups words into punchy 2-3 word chunks and writes dynamic pop-in ASS events.
+        Groups words into ultra-punchy 1-2 word chunks and writes dynamic pop-in ASS events
+        repositioned to the lower-third reading sweet spot.
         """
         dest_path = output_file or self.output_ass_path
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
         lines: list[str] = [generate_ass_header()]
 
-        chunk_size = 3
         total_words = len(words_list)
         chunk_idx = 0
 
         i = 0
         while i < total_words:
-            # Determine chunk: 2 to 3 words
-            end_i = min(i + chunk_size, total_words)
+            # High-retention chunking: 1-2 words per visual pop
+            # If word is 8+ chars (long word) or at sentence end, keep as single word chunk
+            curr_word = words_list[i].word
+            remaining = total_words - i
+            if remaining == 1 or len(curr_word) >= 8:
+                step = 1
+            else:
+                step = 2
+
+            end_i = min(i + step, total_words)
             chunk = words_list[i:end_i]
             if not chunk:
                 break
 
             start_time = chunk[0].start
-            end_time = max(chunk[-1].end, start_time + 0.35)
+            end_time = max(chunk[-1].end, start_time + 0.32)
 
             start_ass = format_ass_timestamp(start_time)
             end_ass = format_ass_timestamp(end_time)
 
-            # Format words: highlight first or key word in bright yellow, remaining in white
+            # Format words: highlight first word in electric neon yellow, second in crisp white
             formatted_words = []
             for j, w in enumerate(chunk):
                 cleaned = re.sub(r"[^\w\s\'\-]", "", w.word).upper()
                 if not cleaned:
                     cleaned = w.word.upper()
 
-                # Highlight the first word of the chunk with pop-in yellow
                 if j == 0:
                     formatted_words.append(r"{\c&H0000FFFF&}" + cleaned + r"{\c&H00FFFFFF&}")
                 else:
                     formatted_words.append(cleaned)
 
             text_body = " ".join(formatted_words)
-            # Dynamic pop-in bounce scale animation:
-            # Starts at 115% scale, drops smoothly to 100% within 120ms
-            animation_tag = r"{\t(0,60,\fscx115\fscy115)\t(60,130,\fscx100\fscy100)}"
+            # High-retention pop-in scale bounce animation: 115% scale dropping to 100% in 90ms
+            animation_tag = r"{\t(0,50,\fscx115\fscy115)\t(50,110,\fscx100\fscy100)}"
             event_line = f"Dialogue: 0,{start_ass},{end_ass},ShortsDefault,,0,0,0,,{animation_tag}{text_body}\n"
             lines.append(event_line)
 
@@ -209,13 +218,20 @@ class CaptionGenerator:
     ) -> Path:
         """
         Coordinates transcription and subtitle file generation.
-        Tries faster-whisper first; falls back cleanly to proportional timing.
+        For Hinglish, uses exact scene display_text for 100% flawless phonetic spelling.
+        For English, runs faster-whisper with proportional timing fallback.
         """
         words: list[WordTimestamp] = []
-        try:
-            words = self._transcribe_with_faster_whisper(merged_audio_path)
-        except Exception as e:
-            logger.warning("faster-whisper transcription unavailable (%s). Using timing fallback.", e)
+        is_hinglish = getattr(config, "LANGUAGE", "hinglish").lower() in ("hinglish", "hindi")
+
+        if is_hinglish:
+            logger.info("Language is Hinglish/Hindi: using script display_text for perfect Romanized on-screen subtitles.")
+            words = self._fallback_word_timestamps(script, scene_audios, total_duration)
+        else:
+            try:
+                words = self._transcribe_with_faster_whisper(merged_audio_path)
+            except Exception as e:
+                logger.warning("faster-whisper transcription unavailable (%s). Using timing fallback.", e)
 
         if not words:
             words = self._fallback_word_timestamps(script, scene_audios, total_duration)

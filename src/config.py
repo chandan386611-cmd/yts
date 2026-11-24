@@ -125,8 +125,8 @@ class PipelineConfig(BaseModel):
     TARGET_MAX_WORDS: int = Field(
         default_factory=lambda: int(os.getenv("TARGET_MAX_WORDS", "120"))
     )
-    MIN_SCENES: int = 9
-    MAX_SCENES: int = 11
+    MIN_SCENES: int = 10
+    MAX_SCENES: int = 15
 
     # Video Output Specifications
     VIDEO_WIDTH: int = 1080

@@ -73,10 +73,11 @@ class VideoEditor:
             target_duration,
         )
 
-        # Scale and crop to exact 1080x1920 with Lanczos interpolation, 3D denoising, smart sharpening & contrast boost
+        # Scale and crop to exact 1080x1920 with subtle push-in motion, 3D denoising, smart sharpening & contrast boost
         vf = (
             "scale=1080:1920:force_original_aspect_ratio=increase:flags=lanczos,"
             "crop=1080:1920,"
+            "zoompan=z='min(zoom+0.0008,1.06)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,"
             "hqdn3d=1.5:1.5:6:6,"
             "unsharp=lx=5:ly=5:la=0.8:cx=3:cy=3:ca=0.4,"
             "eq=contrast=1.05:saturation=1.05,"

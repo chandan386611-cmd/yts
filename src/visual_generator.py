@@ -136,6 +136,24 @@ def generate_procedural_cinematic_fallback(
     return base
 
 
+ABSTRACT_SEARCH_STOPWORDS: set[str] = {
+    # Moods & Emotions (cause random unrelated stock clips)
+    "sad", "happy", "crying", "angry", "loyal", "loyalty", "emotional", "heartbreaking",
+    "heartbroken", "intense", "dramatic", "crazy", "shocking", "creepy", "scary",
+    "terrifying", "mindblowing", "beautiful", "amazing", "incredible", "satisfying",
+    "mysterious", "secret", "secrets", "mystery", "curious", "strange", "impossible",
+    # Abstract concepts & Non-physical traits
+    "poor", "rich", "real", "fake", "true", "truth", "good", "bad", "deep",
+    "best", "worst", "dark", "light", "pure", "weird", "unbelievable",
+    # Time, Question & Generic filler words
+    "what", "why", "how", "when", "where", "who", "which", "whose", "whom",
+    "today", "yesterday", "tomorrow", "forever", "never", "always",
+    "first", "last", "every", "daily", "year", "years", "night", "days",
+    "story", "stories", "facts", "fact", "life", "reason", "time", "human",
+    "cinematic", "portrait", "shot", "macro", "view", "scene", "footage", "video",
+}
+
+
 class VisualGenerator:
     """Manages Scene 0 video hook generation and Scenes 1-N FLUX image generation."""
 
@@ -280,12 +298,20 @@ class VisualGenerator:
         if not clean_q:
             return None
 
-        # Build progressive fallback search terms
-        tokens = [w for w in clean_q.split() if len(w) >= 3 and w.lower() not in {"portrait", "shot", "macro", "view", "scene"}]
+        # Build progressive fallback search terms prioritizing concrete physical nouns
+        raw_tokens = [w.lower() for w in clean_q.split() if len(w) >= 3]
+        concrete_tokens = [w for w in raw_tokens if w not in ABSTRACT_SEARCH_STOPWORDS]
+
         candidate_queries = [clean_q]
-        if len(tokens) >= 2:
-            candidate_queries.append(" ".join(tokens[:2]))
-        for t in tokens:
+        # Remove abstract adjectives so Coverr gets concrete multi-word queries (e.g. 'dog hospital' instead of 'sad dog hospital')
+        if concrete_tokens and " ".join(concrete_tokens) != clean_q.lower():
+            candidate_queries.append(" ".join(concrete_tokens))
+
+        if len(concrete_tokens) >= 2:
+            candidate_queries.append(" ".join(concrete_tokens[:2]))
+
+        # Fallback to single tokens ONLY if they are concrete physical nouns (NEVER search abstract words like 'sad' or 'loyal'!)
+        for t in concrete_tokens:
             if t not in candidate_queries:
                 candidate_queries.append(t)
 
@@ -349,13 +375,19 @@ class VisualGenerator:
         if not clean_q:
             return None
 
-        tokens = [w.lower() for w in clean_q.split() if len(w) >= 3 and w.lower() not in {"portrait", "shot", "macro", "view", "scene"}]
+        # Build candidate tags prioritizing concrete physical subjects
+        raw_tokens = [w.lower() for w in clean_q.split() if len(w) >= 3]
+        concrete_tokens = [w for w in raw_tokens if w not in ABSTRACT_SEARCH_STOPWORDS]
+
         candidate_tags = []
-        if len(tokens) >= 2:
-            candidate_tags.append("-".join(tokens[:2]))
-        for t in tokens:
+        if len(concrete_tokens) >= 2:
+            candidate_tags.append("-".join(concrete_tokens[:2]))
+        for t in concrete_tokens:
             if t not in candidate_tags:
                 candidate_tags.append(t)
+        # If no concrete token found, fall back to non-stopword tokens
+        if not candidate_tags and raw_tokens:
+            candidate_tags.append(raw_tokens[0])
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -406,36 +438,52 @@ class VisualGenerator:
         if not pexels_key:
             return None
 
+        clean_q = re.sub(r"[^\w\s]", " ", query).strip()
+        if not clean_q:
+            return None
+
+        raw_tokens = [w.lower() for w in clean_q.split() if len(w) >= 3]
+        concrete_tokens = [w for w in raw_tokens if w not in ABSTRACT_SEARCH_STOPWORDS]
+
+        candidate_queries = [clean_q]
+        if concrete_tokens and " ".join(concrete_tokens) != clean_q.lower():
+            candidate_queries.append(" ".join(concrete_tokens))
+        if len(concrete_tokens) >= 2:
+            candidate_queries.append(" ".join(concrete_tokens[:2]))
+
         url = "https://api.pexels.com/v1/search"
         headers = {
             "Authorization": pexels_key,
             "User-Agent": "YouTubeShortsPipeline/1.0",
         }
-        params = {
-            "query": query,
-            "orientation": "portrait",
-            "per_page": 5,
-        }
-        try:
-            res = requests.get(url, headers=headers, params=params, timeout=12)
-            if res.status_code == 200:
-                data = res.json()
-                photos = data.get("photos", [])
-                if photos:
-                    img_url = (
-                        photos[0].get("src", {}).get("portrait")
-                        or photos[0].get("src", {}).get("large2x")
-                        or photos[0].get("src", {}).get("original")
-                    )
-                    if img_url:
-                        dl = requests.get(img_url, timeout=20)
-                        if dl.status_code == 200 and len(dl.content) > 10000:
-                            logger.info("Found Pexels portrait photo for '%s'", query)
-                            return dl.content
-            else:
-                logger.warning("Pexels API HTTP %d: %s", res.status_code, res.text[:150])
-        except Exception as e:
-            logger.debug("Pexels fetch error for '%s': %s", query, e)
+
+        for q in candidate_queries:
+            params = {
+                "query": q,
+                "orientation": "portrait",
+                "per_page": 5,
+            }
+            try:
+                res = requests.get(url, headers=headers, params=params, timeout=12)
+                if res.status_code == 200:
+                    data = res.json()
+                    photos = data.get("photos", [])
+                    if photos:
+                        img_url = (
+                            photos[0].get("src", {}).get("portrait")
+                            or photos[0].get("src", {}).get("large2x")
+                            or photos[0].get("src", {}).get("original")
+                        )
+                        if img_url:
+                            dl = requests.get(img_url, timeout=20)
+                            if dl.status_code == 200 and len(dl.content) > 10000:
+                                logger.info("Found Pexels portrait photo for '%s'", q)
+                                return dl.content
+                elif res.status_code in (401, 403, 429):
+                    logger.warning("Pexels API HTTP %d: %s", res.status_code, res.text[:150])
+                    break
+            except Exception as e:
+                logger.debug("Pexels fetch error for '%s': %s", q, e)
         return None
 
     def _call_wikimedia_commons(self, query: str, topic: str = "") -> bytes | None:

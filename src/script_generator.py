@@ -298,8 +298,8 @@ def _build_system_prompt(recent_topics: list[str], niche: str) -> str:
             "   - Use '।' (purna viram) or '.' for clean, confident sentence conclusions.\n"
             "2. 'display_text': On-screen subtitle text. MUST be written in punchy Romanized HINGLISH (Hindi in English/Latin letters, e.g., 'Imagine kijiye...', 'Ek kutta har din...').\n"
             "3. 'title' & 'description': Write in high-CTR, high-curiosity Hinglish with viral hashtags.\n"
-            "4. 'search_query': MUST BE 2-3 CLEAN ENGLISH KEYWORDS matching real stock video footage (e.g., 'stray dog', 'hospital entrance', 'sad dog', 'doctor walking', 'happy dog', 'deep sea', 'dinosaur', 'dark room').\n"
-            "5. 'visual_prompt': MUST ALWAYS BE IN ENGLISH for the AI video generator."
+            "4. 'search_query': MUST strictly be 2-3 concrete physical English nouns or action verbs that illustrate the EXACT tangible action or object in this sentence (e.g., 'stray dog hospital', 'doctor walking hallway', 'dog eating food', 'dog waiting door', 'empty hospital room'). NEVER include abstract feelings or moods (e.g. NEVER use 'sad', 'loyal', 'happy', 'intense', 'emotional', 'heartbreaking') because stock video libraries return completely random footage for emotion words!\n"
+            "5. 'visual_prompt': MUST ALWAYS BE IN ENGLISH for the AI video generator, specifying camera angle (Close-up, Wide shot, Tracking) and subtle motion."
         )
     else:
         language_rule = (
@@ -337,8 +337,12 @@ THE 4-ACT VIRAL STORYTELLING STRUCTURE:
 CRITICAL RETENTION & TIMING RULES:
 1. {language_rule}
 2. TOTAL SPOKEN WORDS: MUST BE STRICTLY BETWEEN {config.TARGET_MIN_WORDS} AND {config.TARGET_MAX_WORDS} WORDS TOTAL across the entire script. Spoken at an energetic brisk pace (150-165 WPM), this results in exactly 40.0 to 45.0 seconds of audio.
-3. SCENE COUNT: EXACTLY {config.MIN_SCENES} TO {config.MAX_SCENES} DISTINCT SCENES (numbered 0 to N-1).
-4. PACING: Each individual scene narration must be 9 to 14 words (~3.5 to 4.2 seconds).
+3. SCENE COUNT: EXACTLY {config.MIN_SCENES} TO {config.MAX_SCENES} DISTINCT VISUAL SHOTS (numbered 0 to N-1).
+4. PACING & VISUAL MATCH (CRITICAL FOR SHORTS RETENTION):
+   - Fast Pacing: Each scene narration must be 6 to 9 words (~1.8 to 2.8 seconds). Never leave a clip on screen for several seconds without visual change!
+   - Semantic Match: Every scene must illustrate the specific sentence being spoken. Never output generic cinematic footage.
+   - Varied Camera Perspectives: Alternate camera angles every scene (e.g. Extreme Close-Up, Wide Shot, Low-Angle Tracking, Over-the-Shoulder).
+   - Dynamic Motion: In visual_prompt, always specify subtle camera movement (e.g. 'Slow push-in', 'Dynamic tracking shot', 'Slow pan').
 5. STRICT DEDUPLICATION: DO NOT reuse or closely duplicate any of the following recently covered topics:
 {avoid_list if avoid_list else "(No prior topics - pick an ultra-viral breakthrough story)"}
 
@@ -440,7 +444,7 @@ def generate_fallback_offline_script(niche: str) -> ShortScript:
                     narration="और जो सच सामने आया... उसने पूरे स्टाफ की आंखें नम कर दीं।",
                     display_text="Aur jo sach saamne aaya... usne poore staff ki aankhein nam kar din.",
                     visual_prompt="Hospital nurse wiping tears looking with deep emotion",
-                    search_query="sad nurse",
+                    search_query="nurse hospital",
                     estimated_duration=4.1,
                 ),
                 ScenePrompt(
