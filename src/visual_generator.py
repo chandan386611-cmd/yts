@@ -694,7 +694,9 @@ class VisualGenerator:
             "gta", "game", "gaming", "rockstar", "vice", "leonida", "budget",
             "character", "animation", "3d", "cgi", "developer", "indian", "studio", "bangalore",
             "sun", "space", "earth", "planet", "galaxy", "orbit", "solar", "astronomy",
-            "universe", "disappear", "frozen", "darkness", "cosmos", "moon", "star", "what if"
+            "universe", "disappear", "frozen", "darkness", "cosmos", "moon", "star", "what if",
+            "goa", "portugal", "portuguese", "operation", "army", "navy", "military", "war",
+            "colonial", "battle", "soldier", "vijay", "liberation", "surrender", "history"
         ])
 
         if not is_gaming_or_fiction:

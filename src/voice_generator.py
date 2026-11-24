@@ -200,7 +200,7 @@ class VoiceGenerator:
                 cmd = [
                     ffmpeg_bin, "-y",
                     "-i", str(raw_wav_path),
-                    "-af", "silenceremove=start_periods=1:start_threshold=-50dB,loudnorm=I=-14:TP=-1.5:LRA=11",
+                    "-af", "atempo=1.16,silenceremove=start_periods=1:start_threshold=-50dB,loudnorm=I=-14:TP=-1.5:LRA=11",
                     "-c:a", "libmp3lame",
                     "-b:a", "192k",
                     str(output_path),
