@@ -1049,10 +1049,10 @@ class ScriptGenerator:
                     ],
                     "response_format": {"type": "json_object"},
                 }
-                # Newer models like gpt-6-luna and reasoning series only support default temperature
-                if not any(k in model.lower() for k in ["luna", "o1", "o3", "reasoning"]):
+                # Newer models like gpt-6-luna, gpt-6 series, and reasoning models only support default temperature
+                if not any(k in model.lower() for k in ["luna", "astra", "sol", "terra", "gpt-6", "o1", "o3", "reasoning"]):
                     payload["temperature"] = 0.8
-                res = requests.post(url, headers=headers, json=payload, timeout=45)
+                res = requests.post(url, headers=headers, json=payload, timeout=120)
                 if res.status_code == 200:
                     data = res.json()
                     choices = data.get("choices", [])
@@ -1157,8 +1157,8 @@ class ScriptGenerator:
         recent_topics = load_recent_topics(max_history=40)
         system_instruction = _build_system_prompt(recent_topics, config.NICHE_TOPIC)
 
-        if not self.api_key:
-            logger.warning("GEMINI_API_KEY is not set. Using offline fallback script.")
+        if not self.api_key and not self.openai_api_key:
+            logger.warning("Neither GEMINI_API_KEY nor OPENAI_API_KEY is set. Using offline fallback script.")
             return generate_fallback_offline_script(config.NICHE_TOPIC)
 
         if custom_topic and custom_topic.strip():

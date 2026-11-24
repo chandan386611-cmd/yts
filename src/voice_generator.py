@@ -153,6 +153,9 @@ class VoiceGenerator:
             "voice": {
                 "mode": "id",
                 "id": getattr(config, "CARTESIA_VOICE_ID", "7e8cb11d-37af-476b-ab8f-25da99b18644"),
+                "controls": {
+                    "speed": 1.15,
+                },
             },
             "output_format": {
                 "container": "mp3",

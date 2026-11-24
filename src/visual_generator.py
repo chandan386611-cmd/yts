@@ -161,6 +161,35 @@ class VisualGenerator:
         self.visuals_dir = config.TEMP_DIR / "visuals"
         self.visuals_dir.mkdir(parents=True, exist_ok=True)
 
+    def _call_fal_flux(self, prompt: str) -> bytes | None:
+        """Call Fal.ai FLUX.1 Schnell for instantaneous 1080x1920 vertical cinematic images."""
+        if not config.FAL_KEY:
+            return None
+        url = "https://fal.run/fal-ai/flux/schnell"
+        headers = {
+            "Authorization": f"Key {config.FAL_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "prompt": prompt,
+            "image_size": {"width": 1080, "height": 1920},
+            "num_inference_steps": 4,
+            "enable_safety_checker": False,
+        }
+        try:
+            res = requests.post(url, headers=headers, json=payload, timeout=25)
+            if res.status_code == 200:
+                data = res.json()
+                images = data.get("images", [])
+                if images and "url" in images[0]:
+                    img_dl = requests.get(images[0]["url"], timeout=20)
+                    if img_dl.status_code == 200 and len(img_dl.content) > 10000:
+                        logger.info("Retrieved authentic 1080x1920 Fal FLUX visual")
+                        return img_dl.content
+        except Exception as e:
+            logger.debug("Fal FLUX call failed: %s", e)
+        return None
+
     @retry(
         stop=stop_after_attempt(2),
         wait=wait_exponential(multiplier=2, min=2, max=6),
@@ -177,7 +206,7 @@ class VisualGenerator:
             logger.info("Fal.ai video generation skipped: %s. Using still image fallback.", reason)
             return None
 
-        url = "https://queue.fal.run/fal-ai/kling-video/v2.5-turbo/pro/text-to-video"
+        url = "https://queue.fal.run/fal-ai/kling-video/v1/turbo/text-to-video"
         headers = {
             "Authorization": f"Key {config.FAL_KEY}",
             "Content-Type": "application/json",
@@ -200,9 +229,10 @@ class VisualGenerator:
         # Check if direct result or queue status
         if "video" in res_data and "url" in res_data["video"]:
             video_url = res_data["video"]["url"]
-        elif "request_id" in res_data or "status_url" in res_data:
+        elif "request_id" in res_data or "status_url" in res_data or "response_url" in res_data:
             # Poll queue
-            status_url = res_data.get("status_url") or f"https://queue.fal.run/fal-ai/kling-video/v2.5-turbo/pro/requests/{res_data['request_id']}"
+            status_url = res_data.get("status_url") or f"https://queue.fal.run/fal-ai/kling-video/v1/turbo/requests/{res_data['request_id']}/status"
+            response_url = res_data.get("response_url") or f"https://queue.fal.run/fal-ai/kling-video/v1/turbo/requests/{res_data['request_id']}"
             max_wait_seconds = 180
             poll_interval = 5
             elapsed = 0
@@ -212,13 +242,15 @@ class VisualGenerator:
                 time.sleep(poll_interval)
                 elapsed += poll_interval
                 status_res = requests.get(status_url, headers=headers, timeout=20)
-                if status_res.status_code == 200:
+                if status_res.status_code in (200, 202):
                     status_json = status_res.json()
                     status_state = status_json.get("status")
                     if status_state == "COMPLETED":
-                        video_url = status_json.get("response", {}).get("video", {}).get("url")
-                        if not video_url and "video" in status_json:
-                            video_url = status_json["video"].get("url")
+                        resp_fetch = requests.get(response_url, headers=headers, timeout=20)
+                        if resp_fetch.status_code == 200:
+                            video_url = resp_fetch.json().get("video", {}).get("url")
+                        if not video_url:
+                            video_url = status_json.get("response", {}).get("video", {}).get("url")
                         break
                     elif status_state in ("FAILED", "CANCELLED"):
                         logger.error("Fal.ai video generation failed: %s", status_json.get("error"))
@@ -584,28 +616,35 @@ class VisualGenerator:
         logger.info("Generating visual for Scene %d (Query: '%s')...", index, search_query)
         raw_bytes: bytes | None = None
 
-        # Tier 1: Cloudflare Workers AI FLUX
-        if config.CLOUDFLARE_ACCOUNT_ID and config.CLOUDFLARE_API_TOKEN:
+        # Tier 1: Fal.ai FLUX (High-speed, photorealistic 1080x1920 vertical composition)
+        if config.FAL_KEY:
+            try:
+                raw_bytes = self._call_fal_flux(full_prompt)
+            except Exception as e:
+                logger.debug("Fal FLUX call failed for scene %d: %s", index, e)
+
+        # Tier 2: Cloudflare Workers AI FLUX
+        if not raw_bytes and config.CLOUDFLARE_ACCOUNT_ID and config.CLOUDFLARE_API_TOKEN:
             try:
                 raw_bytes = self._call_cloudflare_flux(full_prompt)
             except Exception as e:
                 logger.warning("Cloudflare FLUX call failed for scene %d: %s", index, e)
 
-        # Tier 2: Pexels API
+        # Tier 3: Pexels API
         if not raw_bytes and getattr(config, "PEXELS_API_KEY", ""):
             try:
                 raw_bytes = self._call_pexels_api(search_query)
             except Exception as e:
                 logger.debug("Pexels fallback failed for scene %d: %s", index, e)
 
-        # Tier 3: Wikimedia Commons High-Res Archive (Free, authentic photography)
+        # Tier 4: Wikimedia Commons High-Res Archive (Free, authentic photography)
         if not raw_bytes:
             try:
                 raw_bytes = self._call_wikimedia_commons(search_query, topic=topic)
             except Exception as e:
                 logger.debug("Wikimedia fallback failed for scene %d: %s", index, e)
 
-        # Tier 4: Pollinations.ai FLUX
+        # Tier 5: Pollinations.ai FLUX
         if not raw_bytes:
             try:
                 raw_bytes = self._call_pollinations_flux(scene.visual_prompt)
@@ -648,24 +687,33 @@ class VisualGenerator:
 
         logger.info("Generating visual for Scene %d (Query: '%s')...", index, search_query)
 
-        # Tier 1: Coverr Real Video
-        if config.COVERR_API_KEY:
+        # For gaming, CGI, and hyper-specific creative topics, stock footage libraries (Coverr/Mixkit)
+        # return irrelevant generic clips (e.g. random soccer players or office workers).
+        # Bypass stock footage and use Fal.ai FLUX 1080x1920 vertical photorealistic generation.
+        is_gaming_or_fiction = any(k in (topic + " " + search_query + " " + scene.visual_prompt).lower() for k in [
+            "gta", "game", "gaming", "rockstar", "vice", "leonida", "budget",
+            "character", "animation", "3d", "cgi", "developer", "indian", "studio", "bangalore"
+        ])
+
+        if not is_gaming_or_fiction:
+            # Tier 1: Coverr Real Video
+            if config.COVERR_API_KEY:
+                try:
+                    v_path = self._call_coverr_api(search_query, video_out)
+                    if v_path and v_path.exists() and v_path.stat().st_size > 50000:
+                        return v_path
+                except Exception as e:
+                    logger.debug("Coverr video fetch error for scene %d: %s", index, e)
+
+            # Tier 2: Mixkit Real Video
             try:
-                v_path = self._call_coverr_api(search_query, video_out)
+                v_path = self._call_mixkit_video(search_query, video_out)
                 if v_path and v_path.exists() and v_path.stat().st_size > 50000:
                     return v_path
             except Exception as e:
-                logger.debug("Coverr video fetch error for scene %d: %s", index, e)
+                logger.debug("Mixkit video fetch error for scene %d: %s", index, e)
 
-        # Tier 2: Mixkit Real Video
-        try:
-            v_path = self._call_mixkit_video(search_query, video_out)
-            if v_path and v_path.exists() and v_path.stat().st_size > 50000:
-                return v_path
-        except Exception as e:
-            logger.debug("Mixkit video fetch error for scene %d: %s", index, e)
-
-        # Tier 3-7: Still Image Fallback with Ken Burns
+        # Tier 3-7: Still Image Fallback with Ken Burns (uses Fal.ai FLUX as Tier 1)
         img_path = self.generate_scene_still_image(scene, index, topic=topic)
         return img_path
 
