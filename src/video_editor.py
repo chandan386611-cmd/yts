@@ -168,10 +168,10 @@ class VideoEditor:
             y_expr = "ih/2-(ih/zoom/2)"
 
         zoompan_filter = (
+            f"scale=2160x3840:flags=bilinear,"
             f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':"
             f"d={total_frames}:s={config.VIDEO_WIDTH}x{config.VIDEO_HEIGHT}:fps={fps},"
-            "unsharp=lx=5:ly=5:la=0.6:cx=3:cy=3:ca=0.3,"
-            "eq=contrast=1.05:saturation=1.05,"
+            "eq=contrast=1.03:saturation=1.04,"
             "setsar=1"
         )
 
